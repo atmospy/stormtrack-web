@@ -100,10 +100,18 @@ architecture (static files on a CDN, WebGL2 on the GPU, MapLibre globe); we do *
    Web Worker.
 3. **Click anywhere → instant meteogram** (wind/pressure/temp/precip vs time for that point),
    computed from the frames already in memory: zero API calls, zero latency. A genuine differentiator.
-4. **Lightning layer** from NOAA GOES GLM (open, 20 s cadence). It covers the **Americas, Atlantic
-   and eastern Pacific only**. The UI must show the coverage footprint and say plainly that there
-   is no open real-time feed for South Asia. Not used: Blitzortung (terms forbid commercial/warning use,
-   no external API); MTG Lightning Imager is a later add (needs a free EUMETSAT key; Europe/Africa/Middle East).
+4. **Lightning layer.** Shipped now with the only fully open real-time source, NOAA **GOES GLM** (20 s
+   cadence). It covers the **Americas, Atlantic and eastern Pacific only**; the UI shows the coverage footprint
+   and says plainly that there is no open feed for South Asia.
+   *What the others do:* Windy switched (6 Oct 2023) from Blitzortung to **LINET, a commercial global network run
+   by Nowcast.de**, under an undisclosed partnership (global with minor ocean gaps, seconds-to-tens-of-seconds
+   delay). Nowcast sells the data via an "offer" form; no public price or API. Blitzortung's own terms restrict
+   commercial and warning use and state there is no external API, so we do not use or scrape it. EUMETSAT's MTG
+   Lightning Imager is open after a free Data Store key but covers Europe/Africa/Middle East/Atlantic.
+   *Global lightning therefore needs a licence decision (owner):* (a) ask Nowcast for an offer, or (b) ask
+   Blitzortung's operators for a data-access agreement (their stated conditions: freely accessible application,
+   data served from our own server, CC-BY-SA, credit, not for warning systems), or (c) wait. The ingest keeps a
+   source-agnostic `sources/` extension point, so adding a licensed feed is configuration plus credentials.
 5. **Speed plumbing:** prefetch the next frames, decode on a worker (`createImageBitmap` off-thread),
    cache frames with a service worker, and keep all view state in the URL so any view is a shareable link.
 
@@ -115,6 +123,7 @@ an AI "storm brief" summary.
 - Create **Cloudflare** account resources (Pages project, R2 bucket + API token) and a
   **GitHub** repo for this code (suggested: `atmospy/stormtrack-web`).
 - Optional: NASA **FIRMS MAP_KEY** (free) for fire hotspots.
+- **Lightning outside the Americas:** decide whether to request a licence from Nowcast (LINET) and/or Blitzortung (see Round 2, item 4).
 - Choose a product name/domain (working name: *StormTrack*).
 - The `stormtrack` library's PyPI release (pending trusted-publisher setup) — until then the
   Python services install it from a local checkout / git URL.
