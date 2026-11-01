@@ -129,6 +129,13 @@ Wind averaging: NHC/JTWC are 1-minute; always add `"wind_period_min": 1` to `pos
 Numbers come from `stormtrack.analysis` (see its docs); put caveats (agency wind averaging, the
 satellite-era cut-off) in `notes`.
 
+**Round 2 (all basins; additive, nothing above is removed or renamed):**
+- History and stats exist for all seven IBTrACS basins: `NA`, `EP`, `WP`, `NI`, `SI`, `SP`, `SA` (basin = the storm's *genesis* basin, so a track may leave its basin). `history/<basin>.geojson` features gain `properties.basin`; `stats/<basin>.json` gains `basin`, `name`, `monthly_period` (`[1980, last_year]`, the monthly climatology is satellite-era only) and a per-basin honest `notes` text (agency wind averaging, missing early intensities, provisional latest season, Saffir-Simpson thresholds applied to whatever `wind` the record carries). `category`/`tropical_storm|hurricane|major` therefore mean "wind thresholds on that basin's agency winds", not a like-for-like intensity across basins.
+- `index.json` `history.<basin>` gains `name`, `file` (`storms/history/<basin>.geojson`), `stats` (`storms/stats/<basin>.json`), `bytes` (raw size of the history file) and `gzip_bytes` (level-6 gzip size). A basin appears only if its files exist; consumers must not assume all seven are present. `index.json` is written last; `history/all-index.json` just before it.
+- `public-data/storms/history/all-index.json` (tiny, for the basin picker; fetch this, not the big files):
+  `{"schema":1,"generated":"…Z","basins":[{"id":"WP","name":"West Pacific","count":2400,"year_min":1884,"year_max":2025,"file":"storms/history/WP.geojson","stats":"storms/stats/WP.json","bytes":1234567,"gzip_bytes":234567}],"total_bytes":N,"total_gzip_bytes":N}`, basins in display order NA, EP, WP, NI, SI, SP, SA. `file`/`stats` are relative to the data root.
+- `active.geojson` `basin` uses the same codes (`NA`,`EP`,`WP`,`NI`,`SI`,`SP`,`SA`); Southern-Hemisphere storms are split by genesis longitude (SI 20E-135E, SP 135E-120W, else SA).
+
 ## 3. Hazards (producer: D · consumers: A)
 
 ```
@@ -178,6 +185,18 @@ sorted by time, `dt_s` = seconds since `t0`, lon/lat rounded to 2 dp. Cap ≈ 10
 uniformly in time when exceeded and say so in `index.notes`). Missing/stale source → keep the previous files
 and set `index.stale: true`; never publish an empty file because a download failed.
 Always show the coverage footprint in the UI; never imply "no lightning" where there is no coverage.
+
+**Clarifications from the first implementation (binding):**
+- `index.json` also carries `stale` (boolean, always present), `latency_s` (measured) and an internal `state` object
+  (per-satellite cursors, sub-satellite longitudes, `keep_fraction`). Consumers must **ignore `state`**.
+- `satellites` lists only the satellites actually delivering now (GOES-16 is retired; today G18 West and G19 East).
+- Over the row cap the sample is a stable pseudo-random thinning (a kept flash stays kept between runs), **not**
+  decimation by time; `index.notes` states the kept fraction. Counts shown to users must say "sampled" when `keep_fraction < 1`.
+- `energy_fj` is quantised to 1 fJ. Quality: only GLM `flash_quality_flag == 0` is published.
+- `coverage.geojson` is a `FeatureCollection` with one union (Multi)Polygon feature, marked `approximate: true`
+  (52° great-circle caps around each satellite; the edge is soft, about 0.5 % of flashes lie just outside it).
+- Where two satellites overlap a flash is kept from the satellite nearest in longitude; within ~0.3° of the midpoint a flash may be doubled or dropped once.
+
 
 ## 7. Weather ingest runtime notes
 Jobs must run on a clean Linux machine with no system libraries (see the eccodes lesson: declare native
