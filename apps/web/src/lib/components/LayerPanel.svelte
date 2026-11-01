@@ -2,23 +2,27 @@
   import Icon from './Icon.svelte';
   import { app, type LayerKey } from '#lib/stores/app.svelte';
   import { CATEGORIES } from '#lib/util/storm';
-  import { WIND_RAMP } from '#lib/wind/adapter';
   import { gate } from '#lib/stores/gate.svelte';
+  import { history } from '#lib/history/state.svelte';
+  import FieldControl from './FieldControl.svelte';
+  import LightningControls from './LightningControls.svelte';
+  import HistoryControls from './HistoryControls.svelte';
 
   let open = $state(typeof matchMedia === 'undefined' || !matchMedia('(max-width: 720px)').matches);
 
-  type Row = { key: LayerKey; label: string; icon: 'wind' | 'storm' | 'history' | 'fire' | 'quake' | 'event'; hint: string; key_: string };
+  type Row = { key: LayerKey; label: string; icon: 'wind' | 'storm' | 'history' | 'fire' | 'quake' | 'event' | 'bolt'; hint: string; key_: string };
   const rows: Row[] = [
-    { key: 'wind', label: 'Wind', icon: 'wind', hint: '10 m, GFS', key_: 'W' },
+    { key: 'wind', label: 'Weather', icon: 'wind', hint: 'wind, pressure, temperature, rain', key_: 'W' },
     { key: 'storms', label: 'Active cyclones', icon: 'storm', hint: '', key_: 'S' },
-    { key: 'history', label: 'Historical tracks', icon: 'history', hint: 'N. Indian Ocean', key_: 'H' },
+    { key: 'history', label: 'Storm history', icon: 'history', hint: 'all basins, filters', key_: 'H' },
     { key: 'events', label: 'Natural events', icon: 'event', hint: 'NASA EONET', key_: 'E' },
     { key: 'quakes', label: 'Earthquakes', icon: 'quake', hint: 'USGS 24 h', key_: 'Q' },
-    { key: 'fires', label: 'Fire hotspots', icon: 'fire', hint: 'NASA FIRMS', key_: 'F' }
+    { key: 'fires', label: 'Fire hotspots', icon: 'fire', hint: 'NASA FIRMS', key_: 'F' },
+    { key: 'lightning', label: 'Lightning', icon: 'bolt', hint: 'GOES GLM · Americas', key_: 'G' }
   ];
   function count(k: LayerKey): string {
     if (k === 'storms') return app.active ? String(app.active.features.filter((f) => f.properties.kind === 'position').length) : '';
-    if (k === 'history') return app.history ? String(app.history.features.length) : '';
+    if (k === 'history') return history.enabled.length ? String(history.visible.length) : '';
     if (k === 'events' || k === 'quakes' || k === 'fires') {
       const n = app.hazardIndex?.layers[k]?.count;
       return n === undefined ? '' : String(n);
@@ -59,15 +63,16 @@
       {/each}
     </ul>
     {#if app.layers.wind && app.availability.wind === 'ready'}
-      <div class="sec">
+      <FieldControl />
+      <div class="sec wm">
         <div class="seg" role="group" aria-label="Wind display">
           <button class:on={app.windMode === 'particles' && !app.reducedMotion} disabled={app.reducedMotion} onclick={() => { app.windMode = 'particles'; gate.interact(); }}>Particles</button>
           <button class:on={app.windMode === 'arrows' || app.reducedMotion} onclick={() => { app.windMode = 'arrows'; gate.interact(); }}>Arrows</button>
         </div>
-        <div class="ramp" style="background: linear-gradient(90deg, {WIND_RAMP.map(([s, c]) => `${c} ${(s / 40) * 100}%`).join(',')})"></div>
-        <div class="ticks tnum"><span>0</span><span>10</span><span>20</span><span>30</span><span>40+ m/s</span></div>
       </div>
     {/if}
+    {#if app.layers.lightning}<LightningControls />{/if}
+    {#if app.layers.history && history.index}<HistoryControls />{/if}
     {#if app.layers.storms || app.layers.history}
       <div class="sec">
         <div class="cats" title="Saffir-Simpson scale, 1-minute sustained wind">
@@ -79,7 +84,7 @@
 </aside>
 
 <style>
-  .panel { position: absolute; top: calc(var(--gap) * 2 + 40px + env(safe-area-inset-top, 0px)); left: var(--gap); width: 268px; z-index: 4; overflow: hidden; }
+  .panel { position: absolute; top: calc(var(--gap) * 2 + 40px + env(safe-area-inset-top, 0px)); left: var(--gap); width: 284px; z-index: 4; overflow-x: hidden; overflow-y: auto; max-height: calc(100% - var(--timebar-h) - 100px - var(--gap) * 2); scrollbar-width: thin; }
   .head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; background: none; border: 0; color: var(--text-dim); }
   .chev { margin-left: auto; transition: transform 0.2s; transform: rotate(-90deg); display: grid; }
   .chev.open { transform: none; }
@@ -102,14 +107,13 @@
   @keyframes blink { to { opacity: 0.2; } }
   .k { opacity: 0.6; }
   .sec { padding: 10px 14px 12px; border-top: 1px solid var(--line); }
-  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; background: rgba(255, 255, 255, 0.05); border-radius: 9px; margin-bottom: 10px; }
+  .wm { padding-top: 8px; padding-bottom: 8px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; background: rgba(255, 255, 255, 0.05); border-radius: 9px; }
   .seg button { border: 0; background: none; padding: 5px; border-radius: 7px; color: var(--text-dim); font-size: 12px; }
   .seg button.on { background: rgba(94, 224, 255, 0.16); color: var(--text); }
   .seg button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .ramp { height: 8px; border-radius: 4px; }
-  .ticks { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-faint); margin-top: 4px; }
   .cats { display: flex; flex-wrap: wrap; gap: 4px 10px; }
   .cat { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-dim); }
   .cat i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  @media (max-width: 720px) { .panel { width: min(268px, calc(100vw - 2 * var(--gap))); } .k { display: none; } }
+  @media (max-width: 720px) { .panel { width: min(284px, calc(100vw - 2 * var(--gap))); } .k { display: none; } }
 </style>

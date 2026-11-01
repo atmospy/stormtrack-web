@@ -2,36 +2,50 @@
 
 import gzip
 import json
+import os
 
 import pytest
 from storms_ingest import cli
 from storms_ingest.validate import validate_history, validate_index, validate_stats
 
-DATA = "/Users/syed44/Git_Stuff/Git_Projects/imdtrack/data"
+DATA = os.environ.get("STORMTRACK_DATA_DIR")  # a stormtrack checkout's data/ dir (optional)
 
 
 @pytest.fixture(scope="module")
 def out(tmp_path_factory):
-    import os
+    from storms_ingest import basins
+    from test_multibasin import fake_obs, fake_storms
 
-    if not os.path.isdir(DATA):
-        pytest.skip("stormtrack data dir not available")
-    os.environ["STORMTRACK_DATA_DIR"] = DATA
+    def load(basin, cache_dir=None):
+        obs = fake_obs(basin)
+        return obs, fake_storms(obs), ["IMD", "IBTrACS"] if basin == "NI" else ["IBTrACS"]
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(basins, "load_basin", load)
     out = tmp_path_factory.mktemp("pub")
-    assert cli.main(["--out", str(out), "--only", "history"]) == 0
+    assert cli.main(["--out", str(out), "--only", "history", "--basin", "NI"]) == 0
+    mp.undo()
     return out
 
 
 def test_history_stats_index(out):
     h = json.loads((out / "storms/history/NI.geojson").read_text())
-    assert validate_history(h) == []
-    assert len(h["features"]) > 1500
-    assert len(gzip.compress((out / "storms/history/NI.geojson").read_bytes())) < 1_500_000
+    assert validate_history(h, "NI") == []
     s = json.loads((out / "storms/stats/NI.json").read_text())
     assert validate_stats(s) == []
     ix = json.loads((out / "storms/index.json").read_text())
     assert validate_index(ix) == [] and ix["history"]["NI"]["count"] == len(h["features"])
     assert ix["history"]["NI"]["sources"] == ["IMD", "IBTrACS"]
+
+
+def test_real_ni_dataset_when_available(tmp_path):
+    """Full NI run on the real IMD+IBTrACS data (set STORMTRACK_DATA_DIR to a checkout's data/)."""
+    if not DATA or not os.path.isdir(DATA):
+        pytest.skip("stormtrack data dir not available")
+    assert cli.main(["--out", str(tmp_path), "--only", "history"]) == 0
+    h = json.loads((tmp_path / "storms/history/NI.geojson").read_text())
+    assert validate_history(h, "NI") == [] and len(h["features"]) > 1500
+    assert len(gzip.compress((tmp_path / "storms/history/NI.geojson").read_bytes())) < 1_500_000
 
 
 def test_files_world_readable(out):

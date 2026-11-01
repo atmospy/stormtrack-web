@@ -5,6 +5,7 @@
   import { auth } from '#lib/auth/auth.svelte';
   import { toast } from '#lib/stores/toast.svelte';
   import { gate } from '#lib/stores/gate.svelte';
+  import { meteo } from '#lib/weather/meteo.svelte';
   import { MS_TO_KT, compass, msToKmh } from '#lib/util/storm';
 
   const r = $derived(app.readout);
@@ -25,15 +26,18 @@
 </script>
 
 {#if r}
-  <div class="ro glass tnum" class:pinned={r.pinned} role="status" aria-live={r.pinned ? 'polite' : 'off'}>
+  <div class="ro glass tnum" class:pinned={r.pinned} class:withmg={meteo.point !== null} role="status" aria-live={r.pinned ? 'polite' : 'off'}>
     <div class="coords">{fmt(r.lat, 'N', 'S')} {fmt(r.lon, 'E', 'W')}</div>
+    {#if r.scalar != null && app.primary?.kind === 'scalar'}
+      <div class="wind"><b>{r.scalar.toFixed(app.variable === 'precipitation' ? 1 : app.variable === 'temperature' ? 1 : 0)}</b><small>{app.primary.units}</small></div>
+    {/if}
     {#if r.sample}
       <div class="wind">
         <WindArrow deg={r.sample.deg} size={22} />
         <b>{r.sample.speed.toFixed(1)}</b><small>m/s</small>
         <span class="sub">{(r.sample.speed * MS_TO_KT).toFixed(0)} kt · {msToKmh(r.sample.speed).toFixed(0)} km/h · from {compass(r.sample.deg)} {r.sample.deg.toFixed(0)}°</span>
       </div>
-      <div class="note">model 10 m wind, ~0.5° grid</div>
+      <div class="note">model wind, {app.level === '10m' ? '10 m' : app.level + ' hPa'}</div>
     {:else}
       <div class="note">No wind data here</div>
     {/if}
@@ -49,6 +53,7 @@
 
 <style>
   .ro { position: absolute; left: var(--gap); bottom: calc(var(--timebar-h) + var(--gap) * 2 + var(--safe-b) + 22px); padding: 10px 14px; min-width: 210px; z-index: 3; pointer-events: none; }
+  .ro.withmg { display: none; }
   .ro.pinned { pointer-events: auto; border-color: var(--line-strong); }
   .coords { font-size: 12px; color: var(--text-dim); letter-spacing: 0.04em; }
   .wind { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
@@ -60,5 +65,5 @@
   .acts { display: flex; gap: 6px; margin-top: 8px; }
   .acts .btn { padding: 5px 10px; font-size: 12px; }
   .acts .icon { padding: 5px; width: 28px; height: 28px; }
-  @media (max-width: 720px) { .ro:not(.pinned) { display: none; } .ro { bottom: calc(var(--timebar-h) + var(--gap) * 2 + var(--safe-b)); } }
+  @media (max-width: 720px) { .ro:not(.pinned), .ro.withmg { display: none; } .ro { bottom: calc(var(--timebar-h) + var(--gap) * 2 + var(--safe-b)); } }
 </style>

@@ -1,0 +1,41 @@
+{
+  "name": "@stormtrack/scalar-layer",
+  "version": "0.1.0",
+  "description": "WebGL colour-mapped scalar field layer for MapLibre GL JS (globe + mercator) with isobar generation",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": ["dist", "src", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p demo/tsconfig.json",
+    "test": "vitest run",
+    "demo": "vite --config demo/vite.config.ts"
+  },
+  "peerDependencies": {
+    "maplibre-gl": ">=5.0.0"
+  },
+  "devDependencies": {
+    "maplibre-gl": "^6.16.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

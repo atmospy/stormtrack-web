@@ -1,5 +1,6 @@
 import type { GeoJSONSource, Map as MlMap } from 'maplibre-gl';
-import type { WindField } from '#lib/wind/field';
+import type { WindSample } from '#lib/weather/sample';
+interface WindField { sample(lon: number, lat: number): WindSample | null }
 
 export function addArrowLayer(map: MlMap): void {
   const S = 48;

@@ -1,0 +1,1 @@
+{"schema":2,"generated":"2026-11-01T05:00:00Z","models":[{"id":"gfs","name":"NOAA GFS (SAMPLE)","licence":"Synthetic data for development only","run":"2026-11-01T00:00:00Z","latest":"weather/gfs/latest.json"},{"id":"ecmwf-ifs","name":"ECMWF IFS (SAMPLE)","licence":"Synthetic data for development only","run":"2026-11-01T00:00:00Z","latest":"weather/ecmwf-ifs/latest.json"}]}

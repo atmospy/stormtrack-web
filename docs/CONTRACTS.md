@@ -82,7 +82,9 @@ read what `latest.json` lists, never assume.
 - **Vector fields** use the §1 encoding (8-bit R=u, G=v, B=speed) with the `range` of that field.
 - **Scalar fields** use **16-bit** packing so isobars are smooth: `v16 = round((x - min)/(max - min) * 65535)`,
   `R = v16 >> 8`, `G = v16 & 255`, `B = 0`, `A = 255` (PNG, lossless, no gamma/colour profile).
-  If `transform` is `"sqrt"` encode `sqrt(x)` instead of `x` (and decode by squaring) — used for precipitation.
+  If `transform` is `"sqrt"` (precipitation): `range` is still in **physical units** and
+  `v16 = round((sqrt(x) - sqrt(min)) / (sqrt(max) - sqrt(min)) * 65535)`; decode
+  `x = (sqrt(min) + v16/65535 * (sqrt(max) - sqrt(min)))²`. (So precip `[0,100]` means 0–100 mm.)
 - Precipitation is the **depth accumulated over the interval ending at the frame's valid time** (frame 0 is zeros).
 - All fields in a model share one `grid`; frames share the same `fhr` list per field where possible.
 - Pressure-level winds required in round 2: 850, 700, 500, 300, 250 hPa (+ 10 m).
@@ -201,3 +203,39 @@ Always show the coverage footprint in the UI; never imply "no lightning" where t
 ## 7. Weather ingest runtime notes
 Jobs must run on a clean Linux machine with no system libraries (see the eccodes lesson: declare native
 dependencies as wheels), use no absolute local paths, and pass `ruff check` / `ruff format --check` with the repo's `ruff.toml`.
+
+### 6.1 Multi-source lightning (supersedes the 4-column form above; binding)
+
+The lightning dataset can combine several sources (GOES GLM, plus optional regional feeds such as the unofficial IITM "Damini" feed).
+- `flashes.json` `cols` is now `["dt_s","lon","lat","energy_fj","src"]`. **Consumers must map columns by the names in `cols`, never by fixed position.**
+  `src` is an integer index into `index.sources`. `energy_fj` may be `null` (a source that reports none): draw such strikes at a default size.
+  `lon`/`lat` precision varies by source (GLM 2 dp, IITM 4 dp).
+- `index.sources[i]`: `{id, name, licence, attribution, kind: "satellite"|"ground-network", time_precision: "exact"|"bucketed",
+  time_uncertainty_s, unofficial: bool, latency_s, stale: bool, updated, coverage: "lightning/coverage.geojson", ...}`. Top-level `stale` is true only when **every** source is stale.
+- `coverage.geojson` is a `FeatureCollection` with **one feature per source** (`properties.source` = source id, `approximate: true`, `basis` text). "Inside coverage" means inside the union.
+- UI rules: show the attribution of every source with strikes in view; label `unofficial: true` sources as "unofficial feed";
+  for `time_precision: "bucketed"` strikes the time is an age-bucket midpoint (± `time_uncertainty_s`), so never show an exact timestamp for them.
+- Thinning to the row cap applies only to high-volume sources (GLM); regional sources are never thinned.
+
+### 6.2 Live feed for animation + sound (binding)
+
+Lightning is a **live, animated, audible experience**, not a static layer. For that the ingest also publishes a tiny rolling file the browser polls often:
+
+```
+public-data/lightning/recent.json     # the last ~180 s of strikes; polled every 10-15 s; Cache-Control max-age 10
+```
+`{"schema":1,"generated":"…Z","window_s":180,"cols":["id","t_ms","lon","lat","energy_fj","src"],"rows":[["a1b2c3d4",1793560800123,-84.12,29.4,310.0,0],…]}`
+- `id` is a stable short hash of `(src, t, lon, lat)`; clients de-duplicate on it across polls. `t_ms` is unix milliseconds (the strike time; for `bucketed` sources an estimate, see below). Columns are read by name. Cap ~4 000 rows (thin the high-volume source if exceeded; never the regional one).
+- A source with `time_precision: "bucketed"` assigns each *newly seen* strike a time spread uniformly between the previous successful poll and now (not a fixed bucket midpoint) once a previous poll exists; on a cold start it uses bucket midpoints.
+- `index.json` gains `live: {"delay_s": 90, "poll_s": 20}`: the ingest's measured end-to-end latency and its publishing interval. The client plays strikes back at their own timestamps, a fixed `delay_s` behind real time, so every batch has arrived before it is played, and **shows that delay honestly** ("Live, ≈ 1.5 min behind").
+- `flashes.json` (60 min of history, §6/§6.1) is still published, at a slower cadence, for initial backfill.
+
+**Client experience (binding):** every new strike produces a short bright flash then an expanding ring and a fading afterglow dot (colour by age); heavy cells must stay legible (cap concurrent animations, prefer higher energy). **Sound** is synthesised in the browser (Web Audio; no audio assets): a crack/rumble per strike, louder and sharper when close to the listener point (the map centre or a pinned place), softer and more rumbling when far, with a stylised distance delay (≈ 1 s per 10 km, capped ~6 s), a voice limit (~24) and a master compressor so storms never clip. Sound is **off by default**, enabled by one click (browser autoplay rules), remembers the choice, has a visible mute button and a keyboard shortcut. Photosensitivity: no full-screen or large-area flashing, at most small point flashes; `prefers-reduced-motion` or a "reduce flashing" setting turns flashes into a gentle fade.
+
+**6.3 Clarifications from the multi-source implementation (binding):**
+- `recent.json` covers **180 s** (read `window_s`; do not hard-code). At ~60-80 s feed latency and a 20 s publish cycle a 90 s window would show each strike for only 10-30 s.
+- `index.live.delay_s` = slowest source latency + 20 s + `poll_s` (floor 30). The client plays back `delay_s` behind real time and must show it.
+- `index.sources[i]` may also carry `lon_lat_dp`, `count`, and `satellites` (satellite sources only); `time_uncertainty_s` is 0 for GLM.
+- A source that errors is marked `stale` immediately; its rows are kept only until the window expires.
+- With the loop mode's fast-path upload, `index.count` can lag the uploaded `flashes.json` by up to ~5 min: clients treat `recent.json` as authoritative for live playback and `flashes.json` only for backfill.
+- A strike re-seen by the IITM feed in a later snapshot is dropped by de-duplication, so it keeps its first (estimated) time and id.

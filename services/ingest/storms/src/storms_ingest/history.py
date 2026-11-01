@@ -48,8 +48,17 @@ def _geometry(lons, lats) -> dict:
     return {"type": "MultiLineString", "coordinates": cleaned}
 
 
-def build_history(obs: pd.DataFrame, storms: pd.DataFrame) -> tuple:
-    """FeatureCollection of simplified storms; returns ``(collection, skipped_ids)``."""
+def _basin(m, fallback):
+    b = m.get("basin") if hasattr(m, "get") else None
+    return fallback if b is None or pd.isna(b) else str(b)
+
+
+def build_history(obs: pd.DataFrame, storms: pd.DataFrame, basin: str = None) -> tuple:
+    """FeatureCollection of simplified storms; returns ``(collection, skipped_ids)``.
+
+    Each feature carries ``basin`` (the storm's IBTrACS genesis basin; ``basin`` is the fallback
+    when the frame has no such column).
+    """
     feats, skipped = [], []
     meta = storms.set_index("storm_id")
     for sid, o in obs.sort_values(["storm_id", "time"]).groupby("storm_id", sort=False):
@@ -71,6 +80,7 @@ def build_history(obs: pd.DataFrame, storms: pd.DataFrame) -> tuple:
                 "geometry": geom,
                 "properties": {
                     "id": str(sid),
+                    "basin": _basin(m, basin),
                     "name": None if pd.isna(m["name"]) else str(m["name"]),
                     "year": int(m["year"]),
                     "max_wind_kt": maxw,

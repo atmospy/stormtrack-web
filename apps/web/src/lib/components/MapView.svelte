@@ -5,10 +5,20 @@
   import { MAP } from '#lib/config';
   import { app } from '#lib/stores/app.svelte';
   import { toast } from '#lib/stores/toast.svelte';
-  import { windRuntime } from '#lib/wind/runtime.svelte';
+  import { weather } from '#lib/weather/runtime.svelte';
+  import { meteo } from '#lib/weather/meteo.svelte';
+  import { windMetaFor } from '#lib/data/weather';
   import { createWindLayer, WIND_RAMP, type WindLayerLike } from '#lib/wind/adapter';
+  import { computeIsobars, createScalarLayer, rampFor, scalarMeta, type ScalarLayerLike, type IsobarResult } from '#lib/scalar/adapter';
+  import { addIsobarLayers, setIsobars, setIsobarVisibility } from '#lib/map/isobars';
+  import { addLightningLayers, setAgeStyle, setCoverage, setFlashes, setLightningVisibility } from '#lib/map/lightning';
+  import { applyHistoryFilter, decorate, setHistorySource } from '#lib/map/history';
+  import { history, stormsNear } from '#lib/history/state.svelte';
+  import { lightning } from '#lib/lightning/state.svelte';
+  import { restored } from '#lib/state/share.svelte';
+  import { groupStorms } from '#lib/data/active';
   import { darkStyle } from '#lib/map/style';
-  import { ACTIVE_HIT_LAYERS, HISTORY_LAYER, addStormLayers, setActiveData, setHighlight, setHistoryData, setStormVisibility, startPulse } from '#lib/map/storms';
+  import { ACTIVE_HIT_LAYERS, HISTORY_LAYER, addStormLayers, setActiveData, setHighlight, setStormVisibility, startPulse } from '#lib/map/storms';
   import { HAZARD_HIT_LAYERS, addHazardLayers, popupContent, setHazardData, setHazardVisibility } from '#lib/map/hazards';
   import { addArrowLayer, updateArrows } from '#lib/map/arrows';
   import { ensureHistory } from '#lib/data/boot';
@@ -20,12 +30,15 @@
   let maplibre: typeof MapLibre;
   let windLayer: WindLayerLike | null = $state.raw(null);
   let creatingWind = false;
+  let scalarLayer: ScalarLayerLike | null = $state.raw(null);
+  let creatingScalar = false;
   let pin: Marker | null = null;
   let popup: Popup | null = null;
   let stopPulse: (() => void) | null = null;
 
   const effectiveMode = $derived(app.reducedMotion ? 'arrows' : app.windMode);
   const WIND_ID = 'wind-particles';
+  const SCALAR_ID = 'scalar-field';
 
   onMount(() => {
     let disposed = false;
@@ -44,8 +57,8 @@
       const m = new maplibre.Map({
         container: el,
         style: darkStyle(),
-        center: MAP.initialCenter,
-        zoom: MAP.initialZoom,
+        center: restored.lat !== undefined && restored.lon !== undefined ? [restored.lon, restored.lat] : MAP.initialCenter,
+        zoom: restored.zoom ?? MAP.initialZoom,
         minZoom: 0.8,
         maxPitch: 60,
         attributionControl: { compact: true },
@@ -56,10 +69,15 @@
       m.on('load', () => {
         if (disposed) return;
         addArrowLayer(m);
+        addIsobarLayers(m, 'water_label');
         addStormLayers(m);
         addHazardLayers(m);
+        addLightningLayers(m, 'st-history');
         wire(m);
         map = m;
+        const c0 = m.getCenter();
+        app.center = { lon: c0.lng, lat: c0.lat };
+        app.zoom = m.getZoom();
         ready = true;
         (window as unknown as { __map?: MlMap }).__map = m;
       });
@@ -88,6 +106,19 @@
     return m.queryRenderedFeatures([[x - pad, y - pad], [x + pad, y + pad]], { layers: present });
   }
 
+  const wrapLon = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
+  function readoutAt(lng: number, lat: number, pinned: boolean) {
+    const lon = wrapLon(lng);
+    return { lon, lat, sample: windSample(lon, lat), scalar: weather.sampleScalarAt(lon, lat), pinned };
+  }
+
+  function placePin(lng: number, lat: number) {
+    pin?.remove();
+    const dot = document.createElement('div');
+    dot.className = 'pin';
+    pin = new maplibre.Marker({ element: dot }).setLngLat([lng, lat]).addTo(map!);
+  }
+
   function wire(m: MlMap) {
     let raf = 0;
     let lastEv: MapMouseEvent | null = null;
@@ -102,9 +133,7 @@
         m.getCanvas().style.cursor = hits(m, ev, interactive, 5).length ? 'pointer' : '';
         if (app.readout?.pinned) return;
         const { lng, lat } = ev.lngLat;
-        if (Number.isFinite(lng) && Number.isFinite(lat) && Math.abs(lat) <= 90) {
-          app.readout = { lon: ((((lng + 180) % 360) + 360) % 360) - 180, lat, sample: windSample(lng, lat), pinned: false };
-        }
+        if (Number.isFinite(lng) && Number.isFinite(lat) && Math.abs(lat) <= 90) app.readout = readoutAt(lng, lat, false);
       });
     });
     m.on('mouseout', () => {
@@ -116,6 +145,8 @@
       if (sid) {
         popup?.remove();
         app.select({ type: 'active', id: sid });
+        const at = app.active ? groupStorms(app.active).get(sid)?.position.geometry.coordinates : undefined;
+        if (at) meteo.open(at[0]!, at[1]!);
         return;
       }
       const hz = hits(m, e, HAZARD_HIT_LAYERS)[0];
@@ -143,23 +174,34 @@
           return;
         }
       }
-      // empty map: pin a wind readout here
+      // empty map: pin a readout here, open the meteogram, remember the point for "storms near here"
       const { lng, lat } = e.lngLat;
-      app.readout = { lon: lng, lat, sample: windSample(lng, lat), pinned: true };
-      pin?.remove();
-      const dot = document.createElement('div');
-      dot.className = 'pin';
-      pin = new maplibre.Marker({ element: dot }).setLngLat([lng, lat]).addTo(m);
+      const lon = wrapLon(lng);
+      app.readout = readoutAt(lng, lat, true);
+      placePin(lng, lat);
+      meteo.open(lon, lat);
+      history.point = { lon, lat };
+      lightning.updateCentre(lon, lat);
+      gate.interact();
     });
     m.on('moveend', () => {
       const c = m.getCenter();
       app.center = { lon: c.lng, lat: c.lat };
+      app.zoom = m.getZoom();
+      lightning.updateCentre(wrapLon(c.lng), c.lat);
+      setLightningView(m);
       if (effectiveMode === 'arrows' && app.layers.wind) refreshArrows();
     });
   }
 
+  function setLightningView(m: MlMap) {
+    const b = m.getBounds();
+    const spanLon = b.getEast() - b.getWest();
+    lightning.setView(spanLon >= 360 || m.getZoom() < 1.6 ? null : { west: wrapLon(b.getWest()), south: b.getSouth(), east: wrapLon(b.getEast()), north: b.getNorth() });
+  }
+
   function windSample(lon: number, lat: number) {
-    return windLayer?.sample?.(lon, lat) ?? windRuntime.sample(lon, lat);
+    return weather.sampleWind(lon, lat);
   }
 
   // pinned readout cleared elsewhere (UI) -> remove marker
@@ -169,19 +211,40 @@
       pin = null;
     }
   });
+  // a pin restored from a shared link
+  $effect(() => {
+    if (ready && map && restored.pin && !pin) {
+      const { lon, lat } = restored.pin;
+      app.readout = readoutAt(lon, lat, true);
+      placePin(lon, lat);
+      meteo.open(lon, lat);
+    }
+  });
 
   // ---------- data -> layers ----------
   $effect(() => {
     if (ready && map && app.active) setActiveData(map, app.active);
   });
   $effect(() => {
-    if (ready && map && app.history) setHistoryData(map, app.history);
-  });
-  $effect(() => {
     if (ready && map) setStormVisibility(map, { storms: app.layers.storms, history: app.layers.history });
   });
   $effect(() => {
-    if (app.layers.history) void ensureHistory();
+    if (app.layers.history && history.index) void ensureHistory();
+  });
+  // history: data is set only when a basin is first loaded; everything else is a cheap filter change
+  $effect(() => {
+    const loaded = history.loaded;
+    if (!(ready && map)) return;
+    setHistorySource(map, Object.entries(loaded).flatMap(([b, c]) => decorate(c, b)));
+  });
+  const nearIds = $derived.by(() => {
+    if (!history.near || !history.point) return null;
+    return stormsNear(history.visible, history.point.lon, history.point.lat, history.nearKm).map((f) => f.properties.id);
+  });
+  $effect(() => {
+    const filter = { basins: history.enabled, years: history.yearsEffective, minCategory: history.minCategory, near: nearIds };
+    void history.loaded; // re-apply after the source is replaced
+    if (ready && map) applyHistoryFilter(map, filter);
   });
   $effect(() => {
     if (ready && map) setHighlight(map, app.selection);
@@ -207,16 +270,52 @@
     }
   });
 
-  // ---------- wind ----------
+  // ---------- lightning ----------
   $effect(() => {
-    const cur = windRuntime.current;
-    if (!(ready && map && app.wind && cur) || windLayer || creatingWind) return;
+    if (!app.layers.lightning) return;
+    return lightning.start();
+  });
+  $effect(() => {
+    if (!(ready && map)) return;
+    setLightningVisibility(map, app.layers.lightning && lightning.availability === 'ready');
+  });
+  $effect(() => {
+    const b = lightning.bundle;
+    if (ready && map) {
+      setCoverage(map, b?.coverage ?? null);
+      lightning.updateCentre(wrapLon(app.center.lon), app.center.lat);
+      setLightningView(map);
+    }
+  });
+  let lastFlashes: unknown = null;
+  $effect(() => {
+    const f = lightning.bundle?.flashes ?? null;
+    if (!(ready && map) || f === lastFlashes) return;
+    lastFlashes = f;
+    setFlashes(map, f);
+  });
+  // fade by age; the fade is slow (minutes), so a 5 s tick is plenty
+  $effect(() => {
+    const b = lightning.bundle;
+    const now = lightning.nowMs;
+    const win = lightning.window;
+    if (!(ready && map && b?.flashes)) return;
+    setAgeStyle(map, (now - b.flashes.t0) / 1000, win * 60);
+  });
+
+  // ---------- weather: wind particles ----------
+  const windShown = $derived(weather.wind);
+  const scalarShown = $derived(weather.scalar);
+  $effect(() => {
+    const cur = windShown?.cur;
+    if (!(ready && map && cur) || windLayer || creatingWind) return;
     creatingWind = true;
     const small = matchMedia('(max-width: 720px)').matches;
     createWindLayer({ id: WIND_ID, particleCount: small ? 12000 : 28000, colorRamp: WIND_RAMP, reducedMotion: false })
       .then((layer) => {
-        if (!map || !app.wind) return;
-        layer.setFrame(app.wind.image, cur.image, windRuntime.next?.image ?? null, windRuntime.mix);
+        const w = weather.wind;
+        if (!map || !w) return;
+        layer.setFrame(windMeta(w.cur), w.cur.bitmap, w.next?.bitmap ?? null, 0);
         map.addLayer(layer, 'water_label');
         windLayer = layer;
       })
@@ -229,50 +328,127 @@
       .finally(() => (creatingWind = false));
   });
 
+  const windMetas = new WeakMap<object, ReturnType<typeof windMetaFor>>();
+  function windMeta(s: NonNullable<typeof windShown>['cur']) {
+    // a stable object per field keeps the layer from re-uploading identical metadata
+    let m = windMetas.get(s.field);
+    if (!m || m.width !== s.model.grid.width) {
+      m = windMetaFor(s.model.grid, s.field as Parameters<typeof windMetaFor>[1]);
+      windMetas.set(s.field, m);
+    }
+    return m;
+  }
   $effect(() => {
-    const cur = windRuntime.current;
-    const nxt = windRuntime.next;
+    const w = windShown;
     const layer = windLayer;
-    if (!(layer && cur && app.wind)) return;
-    layer.setFrame(app.wind.image, cur.image, nxt?.index === cur.index + 1 ? nxt.image : null, 0);
+    if (!(layer && w)) return;
+    layer.setFrame(windMeta(w.cur), w.cur.bitmap, w.next?.bitmap ?? null, 0);
   });
   $effect(() => {
-    const m = windRuntime.mix;
+    const m = weather.mix;
     windLayer?.setMix(m);
+    scalarLayer?.setMix(m);
     if (m > 0) map?.triggerRepaint();
   });
 
+  // ---------- weather: scalar fill + isobars ----------
+  $effect(() => {
+    const sc = scalarShown?.cur;
+    if (!(ready && map && sc) || scalarLayer || creatingScalar) return;
+    creatingScalar = true;
+    (async () => {
+      const ramp = await rampFor(app.variable);
+      if (!ramp || !map) return;
+      const layer = await createScalarLayer({ id: SCALAR_ID, ramp, opacity: 0.78 });
+      const w = weather.scalar;
+      if (!map || !w) return;
+      layer.setFrame(scalarMeta(w.cur.model.grid, w.cur.field as never), w.cur.bitmap, w.next?.bitmap ?? null, 0);
+      map.addLayer(layer, map.getLayer('iso-lines') ? 'iso-lines' : 'water_label');
+      scalarLayer = layer;
+    })()
+      .catch((e) => {
+        console.warn('scalar layer unavailable', e);
+        toast.show('Colour layer unavailable on this device', 'warn');
+      })
+      .finally(() => (creatingScalar = false));
+  });
+  $effect(() => {
+    const w = scalarShown;
+    const layer = scalarLayer;
+    if (!(layer && w)) return;
+    layer.setFrame(scalarMeta(w.cur.model.grid, w.cur.field as never), w.cur.bitmap, w.next?.bitmap ?? null, 0);
+  });
+  // ramp follows the variable
+  $effect(() => {
+    const v = app.variable;
+    const layer = scalarLayer;
+    if (!layer || v === 'wind') return;
+    void rampFor(v).then((r) => r && layer.setRamp(r));
+  });
+
+  // isobars for MSLP: computed in the package's worker, cached per frame so playback never recomputes
+  const isoCache = new Map<string, IsobarResult>();
+  let isoToken = 0;
+  $effect(() => {
+    const w = scalarShown?.cur;
+    const on = ready && map && app.layers.wind && app.variable === 'pressure' && w?.field.id === 'mslp';
+    if (!(map && ready)) return;
+    setIsobarVisibility(map, !!on);
+    if (!on || !w) return;
+    const key = `${w.ref.model.model}@${w.ref.model.run}/${w.ref.index}`;
+    const hit = isoCache.get(key);
+    if (hit) return setIsobars(map, hit);
+    const my = ++isoToken;
+    computeIsobars(w.bitmap, scalarMeta(w.model.grid, w.field as never))
+      .then((r) => {
+        isoCache.set(key, r);
+        if (isoCache.size > 24) isoCache.delete(isoCache.keys().next().value as string);
+        if (my === isoToken && map) setIsobars(map, r);
+      })
+      .catch((e) => console.warn('isobars unavailable', e));
+  });
+
+  // ---------- weather: visibility ----------
   $effect(() => {
     if (!(ready && map)) return;
     const on = app.layers.wind && app.availability.wind === 'ready';
-    if (map.getLayer(WIND_ID)) map.setLayoutProperty(WIND_ID, 'visibility', on && effectiveMode === 'particles' ? 'visible' : 'none');
-    map.setLayoutProperty('wind-arrows', 'visibility', on && effectiveMode === 'arrows' ? 'visible' : 'none');
+    const windOn = on && !!windShown;
+    if (map.getLayer(WIND_ID)) map.setLayoutProperty(WIND_ID, 'visibility', windOn && effectiveMode === 'particles' ? 'visible' : 'none');
+    map.setLayoutProperty('wind-arrows', 'visibility', windOn && effectiveMode === 'arrows' ? 'visible' : 'none');
+    scalarLayer?.setVisible(on && !!scalarShown);
   });
 
   function refreshArrows() {
-    const f = windRuntime.current?.field;
-    if (map && f) updateArrows(map, f);
+    if (map && weather.wind) updateArrows(map, { sample: (lon, lat) => weather.sampleWind(lon, lat) });
   }
   $effect(() => {
-    windRuntime.current; // re-run when the frame changes
+    weather.wind; // re-run when the frame changes
     if (ready && map && app.layers.wind && effectiveMode === 'arrows') refreshArrows();
   });
 
   // ---------- camera ----------
+  /** right edge of the left layer panel (so flights keep the target clear of it), 0 on narrow screens */
+  function leftClear(): number {
+    if (window.innerWidth <= 900) return 0;
+    const el = document.querySelector('aside.panel');
+    return el ? Math.ceil(el.getBoundingClientRect().right) + 16 : 0;
+  }
   let lastFly = 0;
   $effect(() => {
     const r = app.flyRequest;
     if (!(ready && map && r) || r.n === lastFly) return;
     lastFly = r.n;
     const duration = app.reducedMotion ? 0 : 1900;
+    const wide = window.innerWidth > 900;
+    const left = Math.max(leftClear(), 60);
+    const right = wide && app.selection ? 420 : 60;
     if (r.bounds) {
-      const wide = window.innerWidth > 900;
       map.fitBounds([[r.bounds[0], r.bounds[1]], [r.bounds[2], r.bounds[3]]], {
-        padding: { top: 90, bottom: 150, left: 60, right: wide && app.selection ? 420 : 60 },
+        padding: { top: 90, bottom: 150, left, right },
         maxZoom: 6, duration
       });
     } else {
-      map.flyTo({ center: [r.lon, r.lat], zoom: r.zoom ?? Math.max(map.getZoom(), 4), duration, essential: false, curve: 1.5 });
+      map.flyTo({ center: [r.lon, r.lat], zoom: r.zoom ?? Math.max(map.getZoom(), 4), duration, essential: false, curve: 1.5, padding: { top: 0, bottom: 0, left: wide ? left - 60 : 0, right: wide && app.selection ? right - 60 : 0 } });
     }
   });
 </script>

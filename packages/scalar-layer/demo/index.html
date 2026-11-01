@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scalar-layer demo</title>
+<style>
+  html, body, #map { margin: 0; height: 100%; background: #05080f; }
+  #ui { position: absolute; top: 10px; left: 10px; z-index: 2; background: rgba(8,12,20,.82); color: #cfe3ff;
+        font: 12px/1.5 system-ui, sans-serif; padding: 10px 12px; border-radius: 8px; width: 240px; backdrop-filter: blur(6px); }
+  #ui label { display: grid; grid-template-columns: 70px 1fr 44px; align-items: center; gap: 6px; margin: 3px 0; }
+  #ui output { text-align: right; font-variant-numeric: tabular-nums; }
+  #ui button, #ui select { margin: 4px 4px 0 0; background:#16233a; color:#cfe3ff; border:1px solid #2b4266; border-radius:4px; padding:3px 8px; cursor:pointer; }
+  #legend { height: 10px; border-radius: 3px; margin: 6px 0 0; }
+  #ticks { display:flex; justify-content: space-between; font: 10px ui-monospace, monospace; color:#8fa; }
+  #stats { margin-top: 6px; font: 11px/1.4 ui-monospace, monospace; color: #8fd; white-space: pre; }
+  #probe { position:absolute; bottom:10px; left:10px; z-index:2; color:#cfe3ff; font:12px ui-monospace,monospace; background:rgba(8,12,20,.7); padding:4px 8px; border-radius:6px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="ui">
+  <b>@stormtrack/scalar-layer</b> <span id="src"></span>
+  <div><select id="field"><option value="mslp">mslp</option><option value="t2m">t2m</option><option value="precip">precip</option></select>
+  <select id="rampSel"><option value="">default ramp</option><option>temperature</option><option>pressure</option><option>precipitation</option><option>viridis</option></select></div>
+  <label>opacity <input id="opacity" type="range" min="0" max="1" step="0.05" value="0.8" /><output id="opacityO"></output></label>
+  <label>blend <input id="mix" type="range" min="0" max="1" step="0.01" value="0" /><output id="mixO"></output></label>
+  <button id="proj">mercator</button><button id="iso">isobars: on</button><button id="vis">hide</button>
+  <div id="legend"></div><div id="ticks"></div>
+  <div id="stats"></div>
+</div>
+<div id="probe">hover the map: probe</div>
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from .basins import BASINS
 from .common import CATEGORY_LABELS, iter_coords
 
 ISO_Z = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -105,7 +106,7 @@ def validate_active(fc: dict) -> list:
     return errs
 
 
-def validate_history(fc: dict) -> list:
+def validate_history(fc: dict, basin: str = None) -> list:
     errs = []
     if fc.get("type") != "FeatureCollection":
         return ["not a FeatureCollection"]
@@ -115,9 +116,23 @@ def validate_history(fc: dict) -> list:
         _coords_ok(f["geometry"], errs, w)
         if f["geometry"]["type"] not in ("LineString", "MultiLineString"):
             errs.append(f"{w}: geometry type")
-        for key in ("id", "name", "year", "max_wind_kt", "category", "imd_grade", "start", "end"):
+        for key in (
+            "id",
+            "basin",
+            "name",
+            "year",
+            "max_wind_kt",
+            "category",
+            "imd_grade",
+            "start",
+            "end",
+        ):
             if key not in p:
                 errs.append(f"{w}: missing {key}")
+        if p.get("basin") not in BASINS or (basin and p.get("basin") != basin):
+            errs.append(f"{w}: bad basin {p.get('basin')!r}")
+        if not isinstance(p.get("year"), int) or not (1800 <= p["year"] <= 2100):
+            errs.append(f"{w}: bad year")
         if p["id"] in seen:
             errs.append(f"{w}: duplicate id")
         seen.add(p["id"])
@@ -125,6 +140,13 @@ def validate_history(fc: dict) -> list:
             errs.append(f"{w}: start/end")
         if p.get("category") is not None and p["category"] not in CATEGORY_LABELS:
             errs.append(f"{w}: category")
+        parts = (
+            f["geometry"]["coordinates"]
+            if f["geometry"]["type"] == "MultiLineString"
+            else [f["geometry"]["coordinates"]]
+        )
+        if any(len(part) < 2 for part in parts):
+            errs.append(f"{w}: degenerate line part")
         for c in iter_coords(f["geometry"]):
             if round(c[0], 2) != c[0] or round(c[1], 2) != c[1]:
                 errs.append(f"{w}: coordinates not rounded to 2 dp")
@@ -168,6 +190,40 @@ def validate_index(ix: dict) -> list:
     if not a or not {"count", "updated", "sources"} <= set(a) or not _isoz(a.get("updated")):
         errs.append("active block")
     for b, h in ix.get("history", {}).items():
+        if b not in BASINS:
+            errs.append(f"history: unknown basin {b}")
         if not {"count", "year_min", "year_max", "sources"} <= set(h):
             errs.append(f"history {b} block")
+        elif not {"name", "file", "stats", "bytes", "gzip_bytes"} <= set(h):
+            errs.append(f"history {b} block lacks Round 2 fields")
+        elif h["file"] != f"storms/history/{b}.geojson" or h["stats"] != f"storms/stats/{b}.json":
+            errs.append(f"history {b} paths")
+    return errs
+
+
+def validate_all_index(ai: dict) -> list:
+    """``storms/history/all-index.json`` (CONTRACTS section 2, Round 2)."""
+    errs = []
+    if ai.get("schema") != 1 or not _isoz(ai.get("generated")):
+        errs.append("schema/generated")
+    rows = ai.get("basins")
+    if not isinstance(rows, list) or not rows:
+        return errs + ["basins missing"]
+    keys = {"id", "name", "count", "year_min", "year_max", "file", "stats", "bytes", "gzip_bytes"}
+    seen = set()
+    for r in rows:
+        if not keys <= set(r):
+            errs.append(f"row {r.get('id')}: missing {sorted(keys - set(r))}")
+            continue
+        if r["id"] not in BASINS or r["id"] in seen:
+            errs.append(f"bad/duplicate basin {r['id']}")
+        seen.add(r["id"])
+        if r["file"] != f"storms/history/{r['id']}.geojson" or r["stats"] != (
+            f"storms/stats/{r['id']}.json"
+        ):
+            errs.append(f"row {r['id']}: paths")
+        if not (r["count"] > 0 and r["year_min"] <= r["year_max"] and r["gzip_bytes"] > 0):
+            errs.append(f"row {r['id']}: values")
+    if ai.get("total_gzip_bytes") != sum(r["gzip_bytes"] for r in rows if "gzip_bytes" in r):
+        errs.append("total_gzip_bytes")
     return errs

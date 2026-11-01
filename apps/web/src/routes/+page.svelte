@@ -8,6 +8,13 @@
   import Conditions from '#lib/components/Conditions.svelte';
   import StormPanel from '#lib/components/StormPanel.svelte';
   import Provenance from '#lib/components/Provenance.svelte';
+  import Weather from '#lib/components/Weather.svelte';
+  import ShareSync from '#lib/components/ShareSync.svelte';
+  import Meteogram from '#lib/components/Meteogram.svelte';
+  import { lightning } from '#lib/lightning/state.svelte';
+  import { history } from '#lib/history/state.svelte';
+  import { applyRestored, restored } from '#lib/state/share.svelte';
+  import { meteo, meteoPinned } from '#lib/weather/meteo.svelte';
   import Toasts from '#lib/components/Toasts.svelte';
   import SignupCard from '#lib/components/SignupCard.svelte';
   import { app } from '#lib/stores/app.svelte';
@@ -16,7 +23,7 @@
   import { bootData } from '#lib/data/boot';
   import { groupStorms, stormBounds } from '#lib/data/active';
   import { toast } from '#lib/stores/toast.svelte';
-  import { windRuntime } from '#lib/wind/runtime.svelte';
+  import { weather } from '#lib/weather/runtime.svelte';
 
   // heavy/rare UI is code-split
   const Palette = () => import('#lib/components/CommandPalette.svelte');
@@ -25,16 +32,18 @@
 
   onMount(() => {
     const ac = new AbortController();
-    if (import.meta.env.DEV) { (window as any).__app = app; (window as any).__wr = windRuntime; }
+    // debug/measurement handles (read-only use): the production build is inspected the same way as dev
+    Object.assign(window, { __app: app, __wr: weather, __meteo: meteo, __lightning: lightning, __history: history });
     const mq = matchMedia('(prefers-reduced-motion: reduce)');
     app.reducedMotion = mq.matches;
     const onMq = () => (app.reducedMotion = mq.matches);
     mq.addEventListener('change', onMq);
+    applyRestored();
     const stopGate = gate.start();
     auth.init();
     void bootData(ac.signal).then(() => {
       // intro: fly to the strongest active storm, if any
-      if (!app.active) return;
+      if (!app.active || restored.lat !== undefined || restored.selection || restored.pin) return; // a shared link keeps its own camera
       const storms = [...groupStorms(app.active).values()].sort((a, b) => (b.position.properties.wind_kt ?? 0) - (a.position.properties.wind_kt ?? 0));
       if (storms[0]) setTimeout(() => app.flyToBounds(stormBounds(storms[0]!)), 700);
     });
@@ -60,11 +69,12 @@
       else if (app.authOpen) app.authOpen = false;
       else if (app.selection) app.select(null);
       else if (app.readout?.pinned) app.readout = null;
+      else if (meteo.point) meteo.close();
       return;
     }
     if (typing || e.metaKey || e.ctrlKey || e.altKey || app.paletteOpen || app.authOpen) return;
     const k = e.key.toLowerCase();
-    const layerKeys: Record<string, Parameters<typeof app.toggle>[0]> = { w: 'wind', s: 'storms', h: 'history', e: 'events', q: 'quakes', f: 'fires' };
+    const layerKeys: Record<string, Parameters<typeof app.toggle>[0]> = { w: 'wind', s: 'storms', h: 'history', e: 'events', q: 'quakes', f: 'fires', g: 'lightning' };
     if (k in layerKeys) app.toggle(layerKeys[k]!);
     else if (k === ' ' && t?.tagName !== 'BUTTON') { e.preventDefault(); app.playing = !app.playing; }
     else if (k === 'arrowright' && t?.tagName !== 'INPUT') { app.playing = false; app.scrubTo(app.frameIdx + 1); gate.interact(); }
@@ -91,6 +101,10 @@
   <StormPanel />
   <Readout />
   <TimeBar />
+  <Meteogram store={meteo} onpin={() => { if (meteo.point) { meteoPinned.open(meteo.point.lon, meteo.point.lat); } }} onclose={() => { meteo.close(); app.readout = null; }} />
+  <Meteogram store={meteoPinned} pinned onclose={() => meteoPinned.close()} />
+  <Weather />
+  <ShareSync />
   <Provenance />
   {#if gate.show && !app.authOpen}<SignupCard />{/if}
   <Toasts />

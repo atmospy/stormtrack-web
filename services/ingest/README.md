@@ -113,3 +113,131 @@ Since `stormtrack` is not on PyPI yet, `services/ingest/storms/pyproject.toml` p
 (the library then downloads its datasets from GitHub). Note the `--only active` run does not touch the history entry in
 `storms/index.json` (it is carried over from the existing index; in CI, download the previous `index.json` from R2 first
 or run `--only all` once so it exists).
+
+### Storms history for all basins (Round 2)
+
+```bash
+cd services/ingest/storms
+uv run ingest-storms --only history --basin all  --out ../../../public-data   # NA,EP,WP,NI,SI,SP,SA
+uv run ingest-storms --only history --basin WP,SP --out ../../../public-data   # subset; others are kept
+```
+Writes `storms/history/<basin>.geojson`, `storms/stats/<basin>.json`, `storms/history/all-index.json` (basin
+picker index) and, last, `storms/index.json`. A basin that fails to download is logged and skipped (the others
+still publish; the previous entry for it stays in the index). Exit code is 1 only if every basin failed.
+
+IBTrACS cache: NI comes from the library's pre-parsed dataset (no download). Every other basin downloads its own
+NCEI CSV once (`ibtracs.<BASIN>.list.v04r01.csv`; NA 58 MB, EP 47 MB, WP 115 MB, SI 78 MB, SP 36 MB, SA 56 kB;
+the 330 MB ALL file is never used) into `--ibtracs-cache-dir` (default `<--cache-dir>/ibtracs`, i.e.
+`~/.cache/stormtrack-web/ibtracs`). Persist that directory between CI runs with `actions/cache`, e.g.
+`path: ~/.cache/stormtrack-web/ibtracs`, `key: ibtracs-v04r01-${{ github.run_id }}`, `restore-keys: ibtracs-v04r01-`
+(IBTrACS is refreshed by NCEI weekly; delete the cache or bump the key monthly to pick up new seasons).
+Run history monthly, not on the 30-minute cron: the cron should call `ingest-storms --only active`.
+
+## Lightning job (workstream D2)
+
+`services/ingest/lightning`: a uv project (package `lightning_ingest`, CLI `ingest-lightning`), output per
+`docs/CONTRACTS.md` section 6. Dependencies are wheel-only (`numpy`, `h5py` which bundles libhdf5, `shapely`,
+`boto3`): no system libraries, no eccodes-style surprises.
+
+```bash
+cd services/ingest/lightning
+uv sync
+uv run ingest-lightning --out ../../../public-data -v          # writes <out>/lightning/{flashes.json,coverage.geojson,index.json}
+uv run ingest-lightning --out /tmp/pub --prev-url https://data.example.com   # stateless CI: previous output read from the CDN
+uv run ingest-lightning --upload                                 # also push to Cloudflare R2 (same R2_* env vars as storms)
+uv run pytest                                                    # offline; `-m network` downloads a few live files
+```
+
+Options: `--window-minutes 60`, `--max-rows 100000`, `--satellites G16,G18,G19` (candidates; see below),
+`--keep-degraded`, `--prev-url`, `--upload`, `-v`. Exit status is 1 only if nothing could be produced
+(no previous output and no usable source).
+
+How it works:
+
+- **Source**: NOAA GOES GLM Level-2 LCFA on the public `noaa-goes16/18/19` AWS buckets (anonymous HTTPS, one ~450 kB
+  file per 20 s). **Operational satellites are detected, not hard-coded**: every run lists the candidates and uses
+  those whose newest file is at most 30 minutes old. On 2026-11-01 that was **G18 (GOES-West, 137.0 W) and
+  G19 (GOES-East, 75.2 W)**; the `noaa-goes16` bucket has no data after 2025-04-07 (GOES-16 was retired from
+  operations) and is skipped automatically. Unused candidates are named in `index.notes`.
+- **Incremental**: the previous `flashes.json`/`index.json` (output dir, else `--prev-url`) are loaded; the per-satellite
+  cursor of the last file processed is kept in `index.state` (additive field). Only newer files are downloaded (8 threads),
+  parsed in memory with h5py (15 files in ~0.1 s), appended, and anything older than the window is dropped. A cold start
+  downloads only the last window (about 360 files, ~100 MB, so run it once, then incrementally). A file whose download
+  fails is retried next run.
+- **Quality**: `flash_quality_flag == 0` only (1/3/5 = degraded: events out of time order, event-count or duration over
+  threshold); fill-valued energies and non-finite coordinates are dropped. Energies are published in fJ (the file stores
+  J, packed in uint16, so the resolution is 1 fJ). Flash time = `flash_time_offset_of_first_event` decoded with its
+  `scale_factor`/`add_offset` (unsigned) from the epoch in its `units` attribute.
+- **Overlap rule** (GOES-East and West both see central America / the Pacific / the Atlantic): a flash is kept only from the
+  satellite whose sub-satellite longitude is nearest to the flash longitude (best geometry), so no flash is counted by
+  both. Within about one parallax (~0.3 deg) of the midpoint (~106 W) a flash may be dropped or doubled.
+- **Cap**: > `--max-rows` is handled by thinning with a deterministic hash of each flash's published (time, lon, lat), so the
+  sample is uniform in time, stable from run to run (a kept flash stays kept), and the sampling fraction is stated in
+  `index.notes`. The real hourly total (~130k) exceeds the cap, so in practice about 60-70% of flashes are shown.
+- **Coverage footprint** (`coverage.geojson`, labelled `approximate: true`): union of 52-degree great-circle caps around
+  each used satellite's sub-satellite point. NOAA ("coverage up to 52 N", <https://www.goes-r.gov/spacesegment/glm.html>)
+  and NASA (<https://lightning.nsstc.nasa.gov/overview_glm.html>, 52 N/S from GOES-East) state ~52 deg; Rudlosky et al. 2019
+  (GRL, doi:10.1029/2018GL081052) say 54 deg; the pixel growing from 8 km (nadir) to 14 km (edge) fits a ~52-54 degree
+  great-circle radius. About 0.5% of detections lie just outside the 52 degree cap, so the edge is soft.
+- **Stale / failure**: if the newest file is older than 10 minutes or listing fails, the previous files are republished
+  untouched with `index.stale: true`; an empty file is never published because a download failed.
+- **Upload**: `flashes.json` and `index.json` get `public, max-age=30, stale-while-revalidate=60`, `coverage.geojson`
+  `max-age=3600`; `index.json` is uploaded last. Env vars as in `storms_ingest.upload`.
+
+### The South Asia gap (candidate sources)
+
+There is **no open real-time lightning source for South Asia**. GLM does not see it (it covers the Americas and adjacent
+oceans). Candidates:
+
+| source | used? | why |
+|---|---|---|
+| NOAA GOES GLM (G18/G19) | **yes** | open, public domain, 20 s cadence, Americas / Atlantic / eastern Pacific |
+| EUMETSAT MTG Lightning Imager (MTG-I1) | **later** | free after registering for an EUMETSAT Data Store key; covers Europe, Africa, Middle East, Atlantic; it does not reach South Asia. Extension point: `src/lightning_ingest/sources/` (implement the `Source` protocol, register in `default_sources`) |
+| Blitzortung | no | terms forbid commercial / warning use and the project states there is no external API |
+| Nowcast **LINET** (what Windy.com uses) | **not without a licence** | commercial global network run by Nowcast.de (Munich); Windy switched to it from Blitzortung on 2023-10-06 under an undisclosed partnership; global with minor ocean gaps, seconds-to-tens-of-seconds delay; sold on request, with no public price or API. Add via the `sources/` extension point once licensed |
+| IITM lightning location network (India) | **not without an agreement** | 83 sensors (Lok Sabha answer, 2021), shared with IMD and states. The Damini Android app (com.lightening.app.damini 1.0.2, Flutter) reads from an **IITM-owned server** (`daminiapp.tropmet.res.in`, IP block registered to IITM-PUNE) over plain HTTP; the endpoint is undocumented and has no published terms. Do not use it in the product without written permission from IITM Pune / MoES |
+| WWLLN (Univ. of Washington) | **not without an agreement** | research use only at 10-minute cadence; faster data via an unnamed commercial reseller; no explicit commercial terms found |
+| FengYun-4 Lightning Mapping Imager (China) | **unverified** | satellite at 105°E watching China and surroundings; access conditions and real-time delivery not confirmed |
+| Himawari / FY-4 GHI-LMI / GK-2A | not used | no open real-time lightning product with a stable public feed that we could verify |
+| commercial networks (Vaisala, Earth Networks, WWLLN) | not used | licensed / paid |
+
+The UI must therefore always show the footprint and never imply "no lightning" outside it.
+
+### Lightning: optional IITM Pune "Damini" feed for India (UNOFFICIAL) and the live loop
+
+**Status: prototype only. Do not launch publicly without written permission from IITM Pune / the Ministry of Earth Sciences.**
+The feed is unofficial and undocumented, has no published licence or terms, is served over plain HTTP, and can change or
+disappear at any time. A changed page makes the source report an error and publish no strikes (never garbage); the other
+sources keep publishing.
+
+- **Enable (opt-in):** `uv run ingest-lightning --source goes-glm,iitm-damini` (repeatable or comma list) or
+  `LIGHTNING_SOURCES=goes-glm,iitm-damini`. Default is `goes-glm` only. `.github/workflows` is not wired for it.
+- **What it is:** `GET http://103.251.184.43/json/india.php` (host registered to IITM-PUNE, reverse DNS
+  `daminiapp.tropmet.res.in`) returns an HTML page (Leaflet map, ~9 kB) with an inline
+  `const lightningData = [{"lat":"17.9333","lng":"94.1774","label":"10min"}, ...];`. lat/lng are strings (4 dp);
+  `label` is `5min`/`10min`/`15min`. No per-strike time, energy or polarity. ~117 strikes spanning lat 8-35, lon 71-98 in one
+  snapshot. CORS `*`, Apache.
+- **Time model (assumption, unverified):** `label` is an age bucket ("within 5 min", "5-10", "10-15"). Cold start: bucket
+  midpoints (2.5/7.5/12.5 min before our fetch time). Once a previous successful poll exists, each newly seen strike gets a
+  deterministic time spread between that poll and now, constrained to its bucket. `time_precision: "bucketed"`,
+  `time_uncertainty_s: 150`; clients must not show exact times. Energy is `null`.
+- **De-duplication:** strikes persist across snapshots as they age; a strike with identical lon/lat (4 dp) and a time within
+  16 min of an already published row of this source is the same strike (the earlier row stays).
+- **Polling policy:** one request per poll, 15 s timeout, 2 MB cap, `User-Agent: stormtrack-web-ingest (+https://github.com/atmospy/stormtrack-web)`,
+  at most one retry (5 s later) after a network error (none after an HTTP error), and an enforced minimum interval between
+  requests (default and floor 60 s, `--iitm-min-interval-s`; kept in `index.state["iitm-damini"]`). A poll sooner than that
+  makes no request. A failed attempt also restarts the interval.
+- **Coverage:** one approximate rectangle (about lon 66-100, lat 5-38, widened with margin if strikes fall outside),
+  `basis: "extent of strikes reported by the feed; not a sensor-coverage map"`.
+- **Open questions:** (1) exact bucket semantics; (2) the server clock was ~5.5 min ahead in one response: the `Date` header
+  vs local time is recorded as `state.clock_skew_s` but never used for ordering; (3) true event-to-feed latency; (4) whether
+  strikes can be revised/removed between snapshots.
+- **Failure isolation / staleness:** each source has its own `stale`/`updated`; top-level `stale` = all sources stale. A failing
+  source keeps its previous rows only until the window expires. Reading a previous 4-column file is treated as a cold start.
+
+**Live mode (CONTRACTS 6.2).** Every run also writes `lightning/recent.json` (last 90 s, `--recent-window-s`; cap 4000, thinning
+only high-volume sources) before `index.json`, and `index.json` has `live: {delay_s, poll_s}`.
+`ingest-lightning --loop [SECONDS]` (default 20) repeats the run until Ctrl-C/SIGTERM, with exponential error backoff
+(max 300 s); GLM downloads only new files each cycle, IITM is still limited by its 60 s floor. With `--upload` each cycle uploads
+`recent.json` (`max-age=10`) and `index.json`; `flashes.json` and `coverage.geojson` every `--upload-full-every-s` (300 s).
+Without `--loop` a single run is performed (CI).

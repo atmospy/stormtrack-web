@@ -12,6 +12,7 @@
     "sample": "node scripts/make-sample.mjs"
   },
   "dependencies": {
+    "@stormtrack/scalar-layer": "workspace:*",
     "@stormtrack/wind-layer": "workspace:*",
     "@supabase/supabase-js": "^2.118.0",
     "maplibre-gl": "^6.16.0"

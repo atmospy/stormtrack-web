@@ -5,16 +5,19 @@
   import { app } from '#lib/stores/app.svelte';
   import { auth } from '#lib/auth/auth.svelte';
   import { toast } from '#lib/stores/toast.svelte';
+  import { historyVertices } from '#lib/data/contracts';
   import { groupStorms, stormBounds } from '#lib/data/active';
   import { ensureHistory, ensureStats } from '#lib/data/boot';
   import { categoryFromLabel, compass, ktToKmh, fmtAgo } from '#lib/util/storm';
+  import { history } from '#lib/history/state.svelte';
+  import { seasonLabel } from '#lib/data/history';
 
   const sel = $derived(app.selection);
   const bundle = $derived(sel?.type === 'active' && app.active ? (groupStorms(app.active).get(sel.id) ?? null) : null);
-  const hist = $derived(sel?.type === 'history' ? (app.history?.features.find((f) => f.properties.id === sel.id) ?? null) : null);
+  const hist = $derived(sel?.type === 'history' ? history.find(sel.id) : null);
   const pos = $derived(bundle?.position.properties ?? null);
   const hp = $derived(hist?.properties ?? null);
-  const basin = $derived(pos?.basin ?? 'NI');
+  const basin = $derived(pos?.basin ?? hp?.basin ?? 'NI');
   const stats = $derived(app.stats[basin] ?? null);
   const cat = $derived(pos ? categoryFromLabel(pos.category.label, pos.wind_kt) : hp ? categoryFromLabel(hp.category, hp.max_wind_kt) : null);
   const title = $derived(pos ? (pos.name ?? pos.id) : (hp?.name ?? hp?.id ?? ''));
@@ -39,7 +42,7 @@
   function zoom() {
     if (bundle) app.flyToBounds(stormBounds(bundle));
     else if (hist) {
-      const cs = hist.geometry.coordinates;
+      const cs = historyVertices(hist.geometry);
       const xs = cs.map((c) => c[0]!), ys = cs.map((c) => c[1]!);
       app.flyToBounds([Math.min(...xs) - 1, Math.min(...ys) - 1, Math.max(...xs) + 1, Math.max(...ys) + 1]);
     }
@@ -73,7 +76,7 @@
       <i class="chip" style="background:{cat?.color}; box-shadow: 0 0 14px {cat?.color}"></i>
       <div class="ttl">
         <h2>{title}</h2>
-        <div class="sub tnum">{pos ? pos.id : hp?.id} · {pos ? `${pos.agency} · ${pos.basin}` : `${hp?.year} · historical`}</div>
+        <div class="sub tnum">{pos ? pos.id : hp?.id} · {pos ? `${pos.agency} · ${pos.basin}` : `${seasonLabel(hp!.year, hp!.basin)}${hp?.basin ? ' · ' + hp.basin : ''} · historical`}</div>
       </div>
       <button class="btn ghost icon" onclick={close} aria-label="Close storm panel"><Icon name="close" size={16} /></button>
     </header>
@@ -89,7 +92,7 @@
           <div><dt>Motion</dt><dd class="p">{pos.heading_deg != null ? `${compass(pos.heading_deg)} ` : ''}{pos.speed_kmh != null ? `${Math.round(pos.speed_kmh)} km/h` : '–'}</dd></div>
         {:else if hp}
           <div><dt>Peak wind</dt><dd>{hp.max_wind_kt ?? '–'} <small>kt</small></dd></div>
-          <div><dt>Year</dt><dd>{hp.year}</dd></div>
+          <div><dt>{hp.basin && ['SI','SP','SA'].includes(hp.basin) ? 'Season' : 'Year'}</dt><dd>{seasonLabel(hp.year, hp.basin)}</dd></div>
           <div><dt>Start</dt><dd class="p">{hp.start || '–'}</dd></div>
           <div><dt>End</dt><dd class="p">{hp.end || '–'}</dd></div>
         {/if}

@@ -2,14 +2,14 @@
   import Icon from './Icon.svelte';
   import WindArrow from './WindArrow.svelte';
   import { app } from '#lib/stores/app.svelte';
-  import { windRuntime } from '#lib/wind/runtime.svelte';
+  import { weather } from '#lib/weather/runtime.svelte';
   import { CITIES } from '#lib/data/cities';
   import { MS_TO_KT, beaufort, compass, distBearing, msToKmh } from '#lib/util/storm';
   import { toast } from '#lib/stores/toast.svelte';
 
   const loc = $derived(app.userLocation ?? app.center);
   const isUser = $derived(app.userLocation !== null);
-  const s = $derived(windRuntime.current?.field.sample(loc.lon, loc.lat) ?? null);
+  const s = $derived((weather.wind, weather.sampleWind(loc.lon, loc.lat)));
   const place = $derived.by(() => {
     let best: { name: string; km: number } | null = null;
     for (const c of CITIES) {
@@ -47,7 +47,7 @@
   });
 </script>
 
-{#if app.wind}
+{#if app.weatherReady}
   <section class="card glass" aria-label="Current conditions" class:hidden={app.selection !== null && !open}>
     <header>
       <span class="label">{isUser ? 'Your location' : 'View centre'}</span>

@@ -1,50 +1,13 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import { app } from '#lib/stores/app.svelte';
-  import { windRuntime } from '#lib/wind/runtime.svelte';
-  import { PLAYBACK } from '#lib/config';
+  import { weather } from '#lib/weather/runtime.svelte';
   import { gate } from '#lib/stores/gate.svelte';
 
-  const frames = $derived(app.wind?.frames ?? []);
+  const frames = $derived(app.primary?.frames ?? []);
   const frame = $derived(app.frame);
   const utc = $derived(frame ? new Date(frame.valid).toLocaleString('en-GB', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) + ' UTC' : '');
   const local = $derived(frame ? new Date(frame.valid).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '');
-
-  // Playback: blend smoothly between frames (mix 0..1), advancing only once the next frame is ready
-  // so a slow connection never stutters. Reduced motion steps discretely.
-  $effect(() => {
-    if (!app.playing || !app.wind) return;
-    let raf = 0;
-    let t0 = performance.now();
-    const loop = (now: number) => {
-      raf = requestAnimationFrame(loop);
-      const n = app.wind!.frames.length;
-      const next = (app.frameIdx + 1) % n;
-      const ready = next === 0 || windRuntime.has(next);
-      if (!ready) {
-        void windRuntime.show(next);
-        t0 = now;
-        windRuntime.mix = 0;
-        return;
-      }
-      const t = (now - t0) / PLAYBACK.stepMs;
-      if (t >= 1) {
-        windRuntime.mix = 0;
-        app.frameIdx = next;
-        t0 = now;
-      } else if (!app.reducedMotion && next !== 0 && windRuntime.next?.index === next) {
-        windRuntime.mix = t;
-      }
-    };
-    raf = requestAnimationFrame(loop);
-    return () => {
-      cancelAnimationFrame(raf);
-      windRuntime.mix = 0;
-    };
-  });
-  $effect(() => {
-    void windRuntime.show(app.frameIdx);
-  });
 
   function step(d: number) {
     app.playing = false;
@@ -53,7 +16,7 @@
   }
 </script>
 
-{#if app.wind && frame}
+{#if app.weatherReady && frame}
   <section class="bar glass" aria-label="Forecast time">
     <div class="ctrl">
       <button class="btn icon ghost" onclick={() => step(-1)} aria-label="Previous frame" disabled={app.frameIdx === 0}><Icon name="step-back" size={16} /></button>
@@ -64,7 +27,7 @@
       <div class="row">
         <span class="fh tnum">{frame.fhr === 0 ? 'Analysis' : `+${frame.fhr} h`}</span>
         <span class="valid tnum">{utc}<span class="loc"> · local {local}</span></span>
-        {#if windRuntime.error}<span class="err">frame failed to load</span>{/if}
+        {#if weather.error}<span class="err" title={weather.error}>frame failed to load</span>{:else if weather.loading}<span class="ld" role="status">loading…</span>{/if}
       </div>
       <input type="range" min="0" max={frames.length - 1} step="1" value={app.frameIdx} oninput={(e) => { app.playing = false; app.scrubTo(+e.currentTarget.value); gate.interact(); }} aria-label="Forecast hour" aria-valuetext={frame.fhr === 0 ? 'Analysis' : `plus ${frame.fhr} hours, ${utc}`} style="--p: {frames.length > 1 ? (app.frameIdx / (frames.length - 1)) * 100 : 0}%" />
       <div class="ticks tnum" aria-hidden="true">
@@ -85,6 +48,7 @@
   .valid { color: var(--text-dim); font-size: 12.5px; }
   .loc { color: var(--text-faint); }
   .err { color: var(--danger); font-size: 12px; margin-left: auto; }
+  .ld { color: var(--text-faint); font-size: 12px; margin-left: auto; }
   input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: none; margin: 0; cursor: pointer; }
   input[type='range']::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, #36d9ff var(--p), rgba(255, 255, 255, 0.14) var(--p)); }
   input[type='range']::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.14); }

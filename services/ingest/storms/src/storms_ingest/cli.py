@@ -10,12 +10,12 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__
+from . import __version__, basins
 from .common import gz_size, now_iso, write_json
 
 log = logging.getLogger("ingest-storms")
 
-DEFAULT_OUT = "/Users/syed44/Git_Stuff/Git_Projects/stormtrack-web/public-data"
+DEFAULT_OUT = "public-data"  # relative to the working directory; CI passes --out explicitly
 DEFAULT_CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "stormtrack-web"
 
 
@@ -27,8 +27,9 @@ def parse_args(argv=None):
     ap.add_argument(
         "--basin",
         default="NI",
-        help="IBTrACS basin code for history/stats (default NI; "
-        "others download a large NCEI file, see README)",
+        help="history/stats basins: ALL, or comma-separated IBTrACS codes "
+        "(NA,EP,WP,NI,SI,SP,SA). Default NI. Non-NI basins download that basin's NCEI CSV "
+        "(25-110 MB each) into <ibtracs-cache-dir>; see README.",
     )
     ap.add_argument(
         "--only",
@@ -40,11 +41,24 @@ def parse_args(argv=None):
         "--cache-dir", default=str(DEFAULT_CACHE), help="cache for cone-radius error samples"
     )
     ap.add_argument(
+        "--ibtracs-cache-dir",
+        default=None,
+        help="cache for downloaded IBTrACS per-basin CSVs (default <cache-dir>/ibtracs); "
+        "persist it between CI runs with actions/cache",
+    )
+    ap.add_argument(
         "--cone-years", type=int, default=2, help="completed seasons used for cone radii"
     )
     ap.add_argument("--no-cone", action="store_true", help="skip the (cached) cone-radius estimate")
     ap.add_argument(
         "--upload", action="store_true", help="upload written files to R2 (needs R2_* env vars)"
+    )
+    ap.add_argument(
+        "--prev-url",
+        default=os.environ.get("PUBLIC_DATA_BASE") or None,
+        help="public data base URL; when the output dir has no previous storms/index.json (a "
+        "stateless CI runner) it is fetched from <prev-url>/storms/index.json so a partial run "
+        "(--only active / history) merges into the published index instead of erasing the rest",
     )
     ap.add_argument("-v", "--verbose", action="store_true")
     return ap.parse_args(argv)
@@ -57,23 +71,53 @@ def _read_json(p: Path):
         return None
 
 
-def run_history(out: Path, basin: str, written: list) -> dict:
-    import stormtrack as st
+def _read_prev_index(out: Path, base_url) -> dict:
+    """Previous ``storms/index.json``: from the output dir, else from the published URL, else {}."""
+    local = _read_json(out / "storms" / "index.json")
+    if local:
+        return local
+    if not base_url:
+        return {}
+    import urllib.request
 
+    try:
+        url = base_url.rstrip("/") + "/storms/index.json"
+        with urllib.request.urlopen(url, timeout=20) as r:  # noqa: S310
+            data = json.loads(r.read())
+        return data if isinstance(data, dict) else {}
+    except Exception as exc:  # noqa: BLE001 - a missing/unreachable index just means a fresh start
+        log.warning("could not read previous index from %s: %s", base_url, exc)
+        return {}
+
+
+def _entry(out: Path, basin: str, count: int, y0: int, y1: int, sources: list) -> dict:
+    """Index block for one basin, sizes measured from the files on disk."""
+    hp = out / "storms" / "history" / f"{basin}.geojson"
+    return {
+        "count": count,
+        "year_min": y0,
+        "year_max": y1,
+        "sources": sources,
+        "name": basins.BASINS[basin],
+        "file": f"storms/history/{basin}.geojson",
+        "stats": f"storms/stats/{basin}.json",
+        "bytes": hp.stat().st_size,
+        "gzip_bytes": gz_size(hp),
+    }
+
+
+def run_history(out: Path, basin: str, written: list, cache_dir: Path = None) -> dict:
     from .history import build_history
     from .stats import build_stats
     from .validate import validate_history, validate_stats
 
     t0 = time.time()
-    if basin == "NI":
-        bt = st.load_ibtracs()
-        sources = ["IMD", "IBTrACS"]
-    else:  # large download from NCEI; documented extension
-        bt = st.load_ibtracs(basin=basin, source="ncei")
-        sources = ["IBTrACS"]
-    obs, storms = bt.observations, bt.storms
-    coll, skipped = build_history(obs, storms)
-    errs = validate_history(coll)
+    obs, storms, sources = basins.load_basin(basin, cache_dir)
+    log.info(
+        "%s: loaded %d storms / %d fixes (%.1fs)", basin, len(storms), len(obs), time.time() - t0
+    )
+    coll, skipped = build_history(obs, storms, basin)
+    errs = validate_history(coll, basin)
     if errs:
         raise RuntimeError(f"history failed validation: {errs[:5]}")
     hp = out / "storms" / "history" / f"{basin}.geojson"
@@ -96,12 +140,44 @@ def run_history(out: Path, basin: str, written: list) -> dict:
     write_json(sp, stats)
     written.append(sp.relative_to(out).as_posix())
     log.info("stats %s written (%.1fs total)", basin, time.time() - t0)
-    return {
-        "count": len(coll["features"]),
-        "year_min": int(obs["year"].min()),
-        "year_max": int(obs["year"].max()),
-        "sources": sources,
+    return _entry(
+        out, basin, len(coll["features"]), int(obs["year"].min()), int(obs["year"].max()), sources
+    )
+
+
+def complete_history_block(out: Path, block: dict) -> dict:
+    """Fill Round 2 fields of entries written by an older run (e.g. NI) from disk."""
+    done = {}
+    for b, h in block.items():
+        if b not in basins.BASINS:
+            continue
+        if (out / "storms" / "history" / f"{b}.geojson").exists():
+            h = {**_entry(out, b, h["count"], h["year_min"], h["year_max"], h["sources"]), **h}
+            h.update(_entry(out, b, h["count"], h["year_min"], h["year_max"], h["sources"]))
+        done[b] = h
+    return {b: done[b] for b in basins.BASINS if b in done}
+
+
+def write_all_index(out: Path, block: dict, written: list) -> dict:
+    rows = [{"id": b, **{k: h[k] for k in _ALL_KEYS}} for b, h in block.items()]
+    ai = {
+        "schema": 1,
+        "generated": now_iso(),
+        "basins": rows,
+        "total_bytes": sum(r["bytes"] for r in rows),
+        "total_gzip_bytes": sum(r["gzip_bytes"] for r in rows),
     }
+    from .validate import validate_all_index
+
+    errs = validate_all_index(ai)
+    if errs:
+        raise RuntimeError(f"all-index invalid: {errs}")
+    write_json(out / "storms" / "history" / "all-index.json", ai)
+    written.append("storms/history/all-index.json")
+    return ai
+
+
+_ALL_KEYS = ("name", "count", "year_min", "year_max", "file", "stats", "bytes", "gzip_bytes")
 
 
 def run_active(out: Path, args, written: list):
@@ -144,8 +220,13 @@ def main(argv=None) -> int:
         format="%(asctime)s %(levelname)s %(message)s",
     )
     out = Path(args.out)
-    basin = args.basin.upper()
-    prev = _read_json(out / "storms" / "index.json") or {}
+    try:
+        todo = basins.basin_list(args.basin)
+    except ValueError as exc:
+        log.error("%s", exc)
+        return 2
+    ib_cache = Path(args.ibtracs_cache_dir or Path(args.cache_dir) / "ibtracs")
+    prev = _read_prev_index(out, args.prev_url)
     written: list = []
     failures = 0
     attempted = 0
@@ -168,19 +249,23 @@ def main(argv=None) -> int:
             failures += 1
             log.error("active job failed: %s", exc)
     if args.only in ("all", "history"):
-        attempted += 1
-        try:
-            history_block[basin] = run_history(out, basin, written)
-        except Exception as exc:  # noqa: BLE001
-            failures += 1
-            log.error("history/stats job failed: %s", exc, exc_info=args.verbose)
+        for basin in todo:
+            attempted += 1
+            try:
+                history_block[basin] = run_history(out, basin, written, ib_cache)
+            except Exception as exc:  # noqa: BLE001
+                failures += 1
+                log.error("history/stats %s failed: %s", basin, exc, exc_info=args.verbose)
 
-    if failures == attempted:
+    if failures == attempted:  # also covers a basin list that produced nothing
         log.error("nothing succeeded; index.json not touched")
         return 1
 
     from .validate import validate_index
 
+    history_block = complete_history_block(out, history_block)
+    if history_block and args.only in ("all", "history"):
+        write_all_index(out, history_block, written)
     index = {
         "schema": 1,
         "generated": now_iso(),

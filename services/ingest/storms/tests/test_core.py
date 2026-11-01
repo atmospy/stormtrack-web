@@ -78,11 +78,11 @@ def test_history_dateline_split_and_range():
             }
         ]
     )
-    coll, skipped = history.build_history(obs, storms)
+    coll, skipped = history.build_history(obs, storms, "NI")
     g = coll["features"][0]["geometry"]
     assert g["type"] == "MultiLineString"
     assert all(-180 <= x <= 180 for part in g["coordinates"] for x, _ in part)
-    assert validate_history(coll) == []
+    assert validate_history(coll, "NI") == []
 
 
 def test_history_simplifies_and_rounds():
@@ -102,11 +102,11 @@ def test_history_simplifies_and_rounds():
             }
         ]
     )
-    coll, _ = history.build_history(obs, storms)
+    coll, _ = history.build_history(obs, storms, "NI")
     f = coll["features"][0]
     assert len(f["geometry"]["coordinates"]) < 10
     assert f["properties"]["category"] == "C1" and f["properties"]["imd_grade"] == "SCS"
-    assert validate_history(coll) == []
+    assert validate_history(coll, "NI") == []
 
 
 def test_history_skips_single_fix():
@@ -124,7 +124,7 @@ def test_history_skips_single_fix():
             }
         ]
     )
-    coll, skipped = history.build_history(obs, storms)
+    coll, skipped = history.build_history(obs, storms, "NI")
     assert coll["features"] == [] and skipped == ["S3"]
 
 

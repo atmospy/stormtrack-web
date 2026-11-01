@@ -5,9 +5,13 @@
   import { gate } from '#lib/stores/gate.svelte';
   import { CITIES } from '#lib/data/cities';
   import { groupStorms } from '#lib/data/active';
-  import { ensureHistory } from '#lib/data/boot';
+    import { history } from '#lib/history/state.svelte';
+  import { seasonLabel } from '#lib/data/history';
   import { categoryFromLabel } from '#lib/util/storm';
   import { toast } from '#lib/stores/toast.svelte';
+  import { shareUrl } from '#lib/state/share.svelte';
+  import { meteo, meteoPinned } from '#lib/weather/meteo.svelte';
+  import { VARIABLES, variablesOf } from '#lib/weather/select';
 
   interface Item { id: string; group: string; label: string; hint?: string; color?: string; run: () => void }
 
@@ -18,29 +22,31 @@
   let searching = $state(false);
 
   $effect(() => {
-    void ensureHistory();
     tick().then(() => input?.focus());
   });
 
   const close = () => (app.paletteOpen = false);
-  const layerNames: [LayerKey, string][] = [['wind', 'wind'], ['storms', 'active cyclones'], ['history', 'historical tracks'], ['events', 'natural events'], ['quakes', 'earthquakes'], ['fires', 'fire hotspots']];
+  const layerNames: [LayerKey, string][] = [['wind', 'weather layer'], ['storms', 'active cyclones'], ['history', 'storm history'], ['events', 'natural events'], ['quakes', 'earthquakes'], ['fires', 'fire hotspots'], ['lightning', 'lightning']];
 
   const base = $derived.by<Item[]>(() => {
     const items: Item[] = [];
     if (app.active) {
       for (const b of groupStorms(app.active).values()) {
         const p = b.position.properties;
-        items.push({ id: `a:${p.id}`, group: 'Active storms', label: p.name ?? p.id, hint: `${p.id} · ${p.wind_kt ?? '?'} kt`, color: categoryFromLabel(p.category.label, p.wind_kt).color, run: () => { app.select({ type: 'active', id: p.id }); gate.interact(); } });
+        items.push({ id: `a:${p.id}`, group: 'Active storms', label: p.name ?? p.id, hint: `${p.id} · ${p.wind_kt ?? '?'} kt`, color: categoryFromLabel(p.category.label, p.wind_kt).color, run: () => { app.select({ type: 'active', id: p.id }); const [lo, la] = b.position.geometry.coordinates as [number, number]; meteo.open(lo, la); gate.interact(); } });
       }
     }
     for (const [key, name] of layerNames) {
       if (app.availability[key] === 'missing' || app.availability[key] === 'error') continue;
       items.push({ id: `l:${key}`, group: 'Layers', label: `${app.layers[key] ? 'Hide' : 'Show'} ${name}`, run: () => app.toggle(key) });
     }
+    items.push({ id: 'x:copy', group: 'Actions', label: 'Copy link to this view', hint: 'model, field, time, layers', run: () => void copyLink() });
+    for (const e of app.catalogue) if (app.models[e.id] && e.id !== app.modelId) items.push({ id: `m:${e.id}`, group: 'Weather', label: `Switch model to ${e.name}`, run: () => app.setModel(e.id) });
+    if (app.model) for (const v of VARIABLES) if (v.id !== app.variable && variablesOf(app.model).includes(v.id)) items.push({ id: `v:${v.id}`, group: 'Weather', label: `Show ${v.id}`, run: () => { app.layers.wind = true; app.setVariable(v.id); } });
     items.push({ id: 'x:play', group: 'Actions', label: app.playing ? 'Pause animation' : 'Play forecast animation', hint: 'Space', run: () => (app.playing = !app.playing) });
     items.push({ id: 'x:help', group: 'Actions', label: 'Keyboard shortcuts', hint: '?', run: () => (app.helpOpen = true) });
     items.push({ id: 'x:signin', group: 'Actions', label: 'Sign in / create account', run: () => (app.authOpen = true) });
-    for (const c of CITIES) items.push({ id: `c:${c.name}`, group: 'Places', label: c.name, hint: c.country, run: () => { app.flyTo(c.lon, c.lat, 6); gate.interact(); } });
+    for (const c of CITIES) items.push({ id: `c:${c.name}`, group: 'Places', label: c.name, hint: c.country, run: () => { app.flyTo(c.lon, c.lat, 6); meteo.open(c.lon, c.lat); gate.interact(); } });
     return items;
   });
 
@@ -56,11 +62,11 @@
       };
       out = base.filter((i) => `${i.label} ${i.hint ?? ''}`.toLowerCase().includes(s)).sort((a, b) => rank(a) - rank(b));
       // historical storms by name or id
-      if (app.history && s.length >= 2) {
-        for (const f of app.history.features) {
+      if (s.length >= 2) {
+        for (const f of history.all) {
           const p = f.properties;
           if (`${p.name ?? ''} ${p.id} ${p.year}`.toLowerCase().includes(s)) {
-            out.push({ id: `h:${p.id}`, group: 'Historical storms', label: p.name ?? p.id, hint: `${p.year} · ${p.max_wind_kt ?? '?'} kt`, color: categoryFromLabel(p.category, p.max_wind_kt).color, run: () => { app.layers.history = true; app.select({ type: 'history', id: p.id }); } });
+            out.push({ id: `h:${p.id}`, group: 'Historical storms', label: p.name ?? p.id, hint: `${seasonLabel(p.year, p.basin)}${p.basin ? ' ' + p.basin : ''} · ${p.max_wind_kt ?? '?'} kt`, color: categoryFromLabel(p.category, p.max_wind_kt).color, run: () => { app.layers.history = true; if (p.basin && !history.enabled.includes(p.basin)) history.toggleBasin(p.basin, true); app.select({ type: 'history', id: p.id }); } });
             if (out.length > 40) break;
           }
         }
@@ -72,6 +78,16 @@
     return out;
   });
 
+  async function copyLink() {
+    const url = shareUrl(meteoPinned.point ?? meteo.point);
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.show('Link copied');
+    } catch {
+      window.prompt('Copy this link', url);
+    }
+  }
+
   async function geocode(text: string) {
     searching = true;
     try {
@@ -81,7 +97,7 @@
         toast.show(`No places found for "${text}"`, 'warn');
         return;
       }
-      remote = j.map((p, n) => ({ id: `r:${n}`, group: 'OpenStreetMap results', label: p.display_name.split(',').slice(0, 2).join(','), hint: p.display_name.split(',').slice(-1)[0]?.trim(), run: () => app.flyTo(+p.lon, +p.lat, 8) }));
+      remote = j.map((p, n) => ({ id: `r:${n}`, group: 'OpenStreetMap results', label: p.display_name.split(',').slice(0, 2).join(','), hint: p.display_name.split(',').slice(-1)[0]?.trim(), run: () => { app.flyTo(+p.lon, +p.lat, 8); meteo.open(+p.lon, +p.lat); } }));
       idx = base.length ? results.length : 0;
       gate.interact();
     } catch {

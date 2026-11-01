@@ -1,7 +1,8 @@
 <script lang="ts">
   import { app } from '#lib/stores/app.svelte';
   import { fmtAgo } from '#lib/util/storm';
-  import { windRuntime } from '#lib/wind/runtime.svelte';
+  import { weather } from '#lib/weather/runtime.svelte';
+  import { lightning } from '#lib/lightning/state.svelte';
 
   let now = $state(Date.now());
   let open = $state(false);
@@ -9,26 +10,27 @@
     const id = setInterval(() => (now = Date.now()), 30000);
     return () => clearInterval(id);
   });
-  const w = $derived(app.wind);
+  const w = $derived(app.model);
   const run = $derived(w ? new Date(w.run).toLocaleString('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) + ' UTC' : '');
   const runShort = $derived(w ? new Date(w.run).toLocaleString('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', hour12: false }).replace(', ', ' ') + 'Z run' : '');
-  const anySample = $derived(app.windSample || app.stormsSample || app.hazardsSample);
+  const anySample = $derived(app.weatherSample || app.stormsSample || app.hazardsSample || (app.layers.lightning && lightning.bundle?.sample));
 </script>
 
 <footer class="prov">
   <button class="line glass tnum" onclick={() => (open = !open)} aria-expanded={open} aria-label="Data sources and provenance">
-    {#if w}<span>{w.source} · {runShort} · {fmtAgo(w.generated, now)}</span>{:else}<span>Loading data…</span>{/if}
-    {#if anySample}<span class="sample" title="Sample data in use: {[app.windSample && 'wind', app.stormsSample && 'storms', app.hazardsSample && 'hazards'].filter(Boolean).join(', ')}">SAMPLE</span>{/if}
+    {#if w}<span>{w.name} · {runShort} · {fmtAgo(w.generated, now)}</span>{:else}<span>Loading data…</span>{/if}
+    {#if anySample}<span class="sample" title="Sample data in use: {[app.weatherSample && 'weather', app.stormsSample && 'storms', app.hazardsSample && 'hazards', app.layers.lightning && lightning.bundle?.sample && 'lightning'].filter(Boolean).join(', ')}">SAMPLE</span>{/if}
   </button>
   {#if open}
     <div class="more glass" role="region" aria-label="Data sources">
       <h3>Data &amp; sources</h3>
       <ul>
-        {#if w}<li><b>Wind</b> {w.level} · {w.source} · run {run}, generated {fmtAgo(w.generated, now)}. Licence: {w.licence || 'see source'}. Values are model output on a ~0.5° grid, not observations.{#if app.windSample} <i>Sample/synthetic data.</i>{/if}</li>{/if}
+        {#if w}<li><b>Weather</b> {app.variable === 'wind' ? app.level === '10m' ? '10 m' : app.level + ' hPa' : app.primary?.id} · {w.name} · run {run}, generated {fmtAgo(w.generated, now)}. Licence: {w.licence || 'see source'}. Values are model output on a {w.grid.width >= 1000 ? '~0.25°' : w.grid.width >= 700 ? '~0.5°' : 'coarse'} grid, not observations.{#if w.stale} <b class="e">Pointer marked stale by the producer.</b>{/if}{#if app.weatherSample} <i>Sample/synthetic data.</i>{/if}</li>{/if}
         <li><b>Cyclones</b> NHC / JTWC active systems{#if app.stormsUpdated}, updated {fmtAgo(app.stormsUpdated, now)}{/if}. Winds are 1-minute sustained. Historical tracks: IMD (3-minute winds) and IBTrACS.{#if app.stormsSample} <i>Sample data.</i>{/if}</li>
         <li><b>Events</b> NASA EONET · <b>Earthquakes</b> USGS · <b>Fires</b> NASA FIRMS{#if app.hazardsSample} <i>(sample data)</i>{/if}</li>
         <li><b>Basemap</b> <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a>, data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors. Place search: Nominatim (OSM) on request.</li>
-        {#if windRuntime.error}<li class="e">Wind frame error: {windRuntime.error}</li>{/if}
+        {#if app.layers.lightning && lightning.bundle}<li><b>Lightning</b> {lightning.bundle.index.sources.map((x) => x.name).join(', ') || 'feed'}, data {lightning.ageMin ?? '?'} min old{#if lightning.stale} <b class="e">(STALE: the producer kept the previous files)</b>{/if}. {lightning.bundle.index.notes}{#if lightning.bundle.sample} <i>Sample data.</i>{/if}</li>{/if}
+        {#if weather.error}<li class="e">Weather frame error: {weather.error}</li>{/if}
       </ul>
     </div>
   {/if}

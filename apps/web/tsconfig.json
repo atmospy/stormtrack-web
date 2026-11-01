@@ -6,7 +6,8 @@
     "*"
   ],
   "exclude": [
-    "src/service-worker"
+    "src/service-worker",
+    "src/service-worker.ts"
   ],
   "compilerOptions": {
     "strict": true,

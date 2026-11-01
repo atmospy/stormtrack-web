@@ -291,10 +291,17 @@ export interface HistoryProps {
   max_wind_kt: number | null;
   category: string | null;
   imd_grade: string | null;
+  /** genesis basin code (round 2; absent in older files) */
+  basin: string | null;
   start: string;
   end: string;
 }
-export type HistoryCollection = GeoJSON.FeatureCollection<GeoJSON.LineString, HistoryProps>;
+export type HistoryGeometry = GeoJSON.LineString | GeoJSON.MultiLineString;
+export type HistoryCollection = GeoJSON.FeatureCollection<HistoryGeometry, HistoryProps>;
+/** All vertices of a history geometry (a track split at the antimeridian is a MultiLineString). */
+export function historyVertices(g: HistoryGeometry): number[][] {
+  return g.type === 'LineString' ? g.coordinates : g.coordinates.flat();
+}
 
 export function parseHistory(raw: unknown): HistoryCollection {
   const C = 'storms/history/*.geojson';
@@ -304,11 +311,13 @@ export function parseHistory(raw: unknown): HistoryCollection {
     const p = `features[${i}]`;
     const fo = obj(C, p, f);
     const g = obj(C, `${p}.geometry`, fo.geometry);
-    if (g.type !== 'LineString') throw new ContractError(C, `${p}.geometry.type`, 'expected LineString');
+    if (g.type !== 'LineString' && g.type !== 'MultiLineString') throw new ContractError(C, `${p}.geometry.type`, `expected LineString or MultiLineString, got ${JSON.stringify(g.type)}`);
     const props = obj(C, `${p}.properties`, fo.properties);
     return {
       type: 'Feature' as const,
-      geometry: { type: 'LineString' as const, coordinates: arr(C, `${p}.geometry.coordinates`, g.coordinates).map((c, j) => lonLat(C, `${p}.geometry.coordinates[${j}]`, c)) },
+      geometry: (g.type === 'LineString'
+        ? { type: 'LineString' as const, coordinates: arr(C, `${p}.geometry.coordinates`, g.coordinates).map((c, j) => lonLat(C, `${p}.geometry.coordinates[${j}]`, c)) }
+        : { type: 'MultiLineString' as const, coordinates: arr(C, `${p}.geometry.coordinates`, g.coordinates).map((part, k) => arr(C, `${p}.geometry.coordinates[${k}]`, part).map((c, j) => lonLat(C, `${p}.geometry.coordinates[${k}][${j}]`, c))) }) as HistoryGeometry,
       properties: {
         id: str(C, `${p}.properties.id`, props.id),
         name: typeof props.name === 'string' && props.name ? props.name : null,
@@ -316,6 +325,7 @@ export function parseHistory(raw: unknown): HistoryCollection {
         max_wind_kt: nullableNum(C, `${p}.properties.max_wind_kt`, props.max_wind_kt),
         category: typeof props.category === 'string' ? props.category : null,
         imd_grade: typeof props.imd_grade === 'string' ? props.imd_grade : null,
+        basin: typeof props.basin === 'string' ? props.basin : null,
         start: typeof props.start === 'string' ? props.start : '',
         end: typeof props.end === 'string' ? props.end : ''
       }

@@ -1,0 +1,24 @@
+[project]
+name = "stormtrack-ingest-lightning"
+version = "0.1.0"
+description = "Lightning (NOAA GOES GLM) ingest job for StormTrack Web (CONTRACTS section 6)"
+requires-python = ">=3.10"
+# All wheel-only (no system libraries): h5py bundles libhdf5.
+dependencies = ["numpy", "h5py", "shapely>=2", "boto3"]
+
+[project.scripts]
+ingest-lightning = "lightning_ingest.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "moto[s3]"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lightning_ingest"]
+
+[tool.pytest.ini_options]
+markers = ["network: live network test (deselect with -m 'not network')"]
+addopts = "-m 'not network'"

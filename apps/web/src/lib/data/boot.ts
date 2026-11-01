@@ -1,7 +1,10 @@
 import { DATA_BASE, SAMPLE_BASE } from '#lib/config';
 import { app } from '#lib/stores/app.svelte';
-import { windRuntime } from '#lib/wind/runtime.svelte';
-import { loadActive, loadHazardIndex, loadHazardLayer, loadHistory, loadStats, loadStormsIndex, loadWind } from './load';
+import { history } from '#lib/history/state.svelte';
+import { applyRestoredHistory } from '#lib/state/share.svelte';
+import { weather } from '#lib/weather/runtime.svelte';
+import { nearestIndex } from '#lib/weather/select';
+import { loadActive, loadCatalogue, loadHazardIndex, loadHazardLayer, loadHistoryIndex, loadStats, loadStormsIndex } from './load';
 
 type HazardName = 'events' | 'quakes' | 'fires';
 let hazardBase = '';
@@ -9,24 +12,34 @@ let stormsBase: string = DATA_BASE;
 
 /** Kick off every data request in parallel; each failure only disables its own layer. */
 export function bootData(signal?: AbortSignal): Promise<void> {
-  return Promise.all([bootWind(signal), bootStorms(signal), bootHazards(signal)]).then(() => undefined);
+  return Promise.all([bootWeather(signal), bootStorms(signal), bootHazards(signal)]).then(() => undefined);
 }
 
-async function bootWind(signal?: AbortSignal): Promise<void> {
-  const r = await loadWind(signal);
+async function bootWeather(signal?: AbortSignal): Promise<void> {
+  const r = await loadCatalogue(signal);
   if (!r.ok) {
     app.availability.wind = r.missing ? 'missing' : 'error';
     app.notes.wind = r.error;
     app.layers.wind = false;
     return;
   }
-  app.wind = r.value.data;
-  app.windBase = r.value.base;
-  app.windSample = r.value.sample;
-  windRuntime.init(r.value.data, r.value.base);
+  const { entries, first, base, sample, legacy } = r.value;
+  app.catalogue = entries;
+  app.models = { ...app.models, [first.model]: { model: first, base } };
+  app.weatherSample = sample;
+  app.weatherLegacy = legacy;
+  // a URL-restored model wins when this catalogue lists it (applyRestored ran before boot)
+  if (app.modelId !== first.model && entries.some((e) => e.id === app.modelId)) await weather.ensureModel(app.modelId);
+  if (!app.models[app.modelId]) app.modelId = first.model;
+  if (app.validMs === null) {
+    // default: the frame nearest to "now" (the run's analysis is hours old)
+    const t = app.times;
+    app.validMs = t.length ? t[nearestIndex(t, Date.now())]! : null;
+  }
+  app.normalise();
   app.availability.wind = 'ready';
-  // start downloading frame 0 right away, in parallel with the map library
-  void windRuntime.show(0);
+  // other models' pointer files are tiny: load them right away so the model switch is instant
+  for (const e of entries) if (e.id !== first.model) void weather.ensureModel(e.id);
 }
 
 async function bootStorms(signal?: AbortSignal): Promise<void> {
@@ -44,28 +57,41 @@ async function bootStorms(signal?: AbortSignal): Promise<void> {
     const idx = await loadStormsIndex(r.value.base, signal);
     const upd = (idx?.active as { updated?: string } | undefined)?.updated;
     app.stormsUpdated = upd ?? times[times.length - 1] ?? null;
-    const hb = idx?.history && typeof idx.history === 'object' ? Object.keys(idx.history) : null;
-    if (hb?.length) app.statsBasins = hb;
   }
+  await bootHistoryIndex(signal);
 }
 
-/** Lazy: the history file can be large, so it is fetched when first needed. */
-let historyPromise: Promise<void> | null = null;
+async function bootHistoryIndex(signal?: AbortSignal): Promise<void> {
+  let r = await loadHistoryIndex(stormsBase, signal);
+  if (!r.ok && r.missing && stormsBase !== SAMPLE_BASE) {
+    r = await loadHistoryIndex(SAMPLE_BASE, signal);
+    if (r.ok) stormsBase = SAMPLE_BASE;
+  }
+  if (!r.ok) {
+    app.availability.history = r.missing ? 'missing' : 'error';
+    app.notes.history = r.error;
+    app.layers.history = false;
+    return;
+  }
+  history.setIndex(r.index, stormsBase);
+  applyRestoredHistory();
+  app.statsBasins = r.index.basins.map((b) => b.code);
+  app.availability.history = 'ready';
+}
+
+/** Lazy: a basin file can be large, so it is fetched when its checkbox is first ticked. */
 export function ensureHistory(): Promise<void> {
-  historyPromise ??= (async () => {
-    app.availability.history = 'loading';
-    let r = await loadHistory('NI', stormsBase);
-    if (!r.ok && r.missing && stormsBase !== SAMPLE_BASE) r = await loadHistory('NI', SAMPLE_BASE);
-    if (!r.ok) {
-      app.availability.history = r.missing ? 'missing' : 'error';
-      app.notes.history = r.error;
-      app.layers.history = false;
-      return;
-    }
-    app.history = r.value.data;
-    app.availability.history = 'ready';
-  })();
-  return historyPromise;
+  if (!history.index) return Promise.resolve();
+  if (history.enabled.length === 0) {
+    // sensible first choice: the basin of the strongest active storm, else the first listed
+    const strongest = app.active?.features
+      .filter((f) => f.properties.kind === 'position')
+      .sort((a, b) => ((b.properties as { wind_kt: number | null }).wind_kt ?? 0) - ((a.properties as { wind_kt: number | null }).wind_kt ?? 0))[0];
+    const b = (strongest?.properties as { basin?: string } | undefined)?.basin;
+    const pick = history.entries.find((e) => e.code === b)?.code ?? history.entries.find((e) => e.code === 'NI')?.code ?? history.entries[0]?.code;
+    if (pick) history.toggleBasin(pick, true);
+  }
+  return Promise.all(history.enabled.map((c) => history.ensure(c))).then(() => undefined);
 }
 
 const statsPromises = new Map<string, Promise<void>>();
@@ -73,8 +99,9 @@ export function ensureStats(basin: string): Promise<void> {
   let p = statsPromises.get(basin);
   if (!p) {
     p = (async () => {
-      let r = await loadStats(basin, stormsBase);
-      if (!r.ok && r.missing && stormsBase !== SAMPLE_BASE) r = await loadStats(basin, SAMPLE_BASE);
+      const file = history.entries.find((e) => e.code === basin)?.stats;
+      let r = await loadStats(basin, stormsBase, undefined, file);
+      if (!r.ok && r.missing && stormsBase !== SAMPLE_BASE) r = await loadStats(basin, SAMPLE_BASE, undefined, file);
       if (r.ok) app.stats = { ...app.stats, [basin]: r.value.data };
     })();
     statsPromises.set(basin, p);
