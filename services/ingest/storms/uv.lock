@@ -1486,8 +1486,8 @@ wheels = [
 
 [[package]]
 name = "stormtrack"
-version = "0.3.1.dev3+g57f1f96a5"
-source = { git = "https://github.com/atmospy/stormtrack?branch=fix%2Frealtime-robustness#57f1f96a5d93de8d440a49ad20428670dd70f9c0" }
+version = "0.3.1.dev3+g8acddf7c1"
+source = { git = "https://github.com/atmospy/stormtrack?branch=main#8acddf7c1b03ce6965b09244c8b84464bdadc680" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -1535,7 +1535,7 @@ requires-dist = [
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "shapely", specifier = ">=2" },
-    { name = "stormtrack", extras = ["xarray"], git = "https://github.com/atmospy/stormtrack?branch=fix%2Frealtime-robustness" },
+    { name = "stormtrack", extras = ["xarray"], git = "https://github.com/atmospy/stormtrack?branch=main" },
 ]
 
 [package.metadata.requires-dev]

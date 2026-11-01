@@ -8,9 +8,9 @@ dependencies = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "stormtrack[xarray]
 [dependency-groups]
 dev = ["pytest", "httpx"]
 
-# Until stormtrack is on PyPI it comes from GitHub (branch to be switched to main once that merges).
+# Until stormtrack is on PyPI it comes from GitHub (replace with the PyPI release once stormtrack is published there).
 [tool.uv.sources]
-stormtrack = { git = "https://github.com/atmospy/stormtrack", branch = "fix/realtime-robustness" }
+stormtrack = { git = "https://github.com/atmospy/stormtrack", branch = "main" }
 
 [build-system]
 requires = ["hatchling"]

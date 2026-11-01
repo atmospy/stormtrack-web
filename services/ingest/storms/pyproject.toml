@@ -12,7 +12,7 @@ ingest-storms = "storms_ingest.cli:main"
 dev = ["pytest", "moto[s3]"]
 
 [tool.uv.sources]
-stormtrack = { git = "https://github.com/atmospy/stormtrack", branch = "fix/realtime-robustness" }
+stormtrack = { git = "https://github.com/atmospy/stormtrack", branch = "main" }
 
 [build-system]
 requires = ["hatchling"]
