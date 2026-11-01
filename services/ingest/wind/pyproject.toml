@@ -6,7 +6,10 @@ requires-python = ">=3.9"
 dependencies = [
   "numpy>=1.23",
   "pillow>=10",
-  "eccodes>=2.42",   # ships its own libeccodes binary wheel (macOS arm64, Linux x86_64)
+  "eccodes>=2.42",
+  # the native libeccodes: the `eccodes` wheel is pure Python, so without this it needs a system
+  # install (Homebrew/apt) and fails on a clean machine such as the CI runner
+  "eccodeslib>=2.42; python_version >= '3.10'",
 ]
 
 [project.optional-dependencies]
