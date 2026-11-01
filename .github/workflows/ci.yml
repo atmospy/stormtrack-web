@@ -50,6 +50,7 @@ jobs:
           - services/ingest/wind
           - services/ingest/storms
           - services/ingest/hazards
+          - services/ingest/lightning
           - services/api
     steps:
       - uses: actions/checkout@v7
