@@ -50,6 +50,43 @@ PNG encoding (8-bit RGBA, no gamma/colour-profile, lossless, fully opaque):
 Frames: forecast hours 0–72 every 3 h at minimum (more later). Default grid 0.5°
 (720×361); the contract is resolution-agnostic — consumers must read `image` and never hard-code sizes.
 
+## 1b. Weather fields v2 — models, levels, scalars (producer: weather ingest · consumers: web app)
+
+Supersedes §1 for new work. §1 (`wind/latest.json`, GFS 10 m wind) **keeps being written** as a
+compatibility alias until the app has migrated; do not remove it.
+
+```
+public-data/weather/index.json                         # catalogue of models
+public-data/weather/<model>/latest.json                # per-model pointer, written last
+public-data/weather/<model>/<run>/<field>/fFFF.png     # run = YYYYMMDDTHH ; field slug e.g. wind_10m, wind_850, mslp, t2m, precip
+```
+`<model>` ids: `gfs`, `ecmwf-ifs`, `ecmwf-aifs`. A model may provide only some fields; consumers must
+read what `latest.json` lists, never assume.
+
+`index.json`: `{"schema":2,"generated":"…Z","models":[{"id":"gfs","name":"NOAA GFS 0.25°","licence":"…","run":"…Z","latest":"weather/gfs/latest.json"}]}`
+
+`<model>/latest.json`:
+```json
+{"schema":2,"model":"gfs","run":"2026-11-01T12:00:00Z","generated":"…Z",
+ "grid":{"width":720,"height":361,"lon_left":-180,"lon_right":179.5,"lat_top":90,"lat_bottom":-90},
+ "fields":[
+  {"id":"wind@10m","slug":"wind_10m","kind":"vector","units":"m/s","level":{"type":"height_agl","value":10,"label":"10 m"},
+   "range":{"u":[-50,50],"v":[-50,50],"speed_max":70},"frames":[{"fhr":0,"valid":"…Z","png":"weather/gfs/20261101T12/wind_10m/f000.png","bytes":312345}]},
+  {"id":"wind@250hPa","slug":"wind_250","kind":"vector","units":"m/s","level":{"type":"pressure","value":250,"label":"250 hPa"},
+   "range":{"u":[-100,100],"v":[-100,100],"speed_max":140},"frames":[…]},
+  {"id":"mslp","slug":"mslp","kind":"scalar","units":"hPa","range":[930,1070],"frames":[…]},
+  {"id":"t2m","slug":"t2m","kind":"scalar","units":"°C","range":[-60,60],"frames":[…]},
+  {"id":"precip","slug":"precip","kind":"scalar","units":"mm per frame interval","range":[0,100],"transform":"sqrt","frames":[…]}
+ ]}
+```
+- **Vector fields** use the §1 encoding (8-bit R=u, G=v, B=speed) with the `range` of that field.
+- **Scalar fields** use **16-bit** packing so isobars are smooth: `v16 = round((x - min)/(max - min) * 65535)`,
+  `R = v16 >> 8`, `G = v16 & 255`, `B = 0`, `A = 255` (PNG, lossless, no gamma/colour profile).
+  If `transform` is `"sqrt"` encode `sqrt(x)` instead of `x` (and decode by squaring) — used for precipitation.
+- Precipitation is the **depth accumulated over the interval ending at the frame's valid time** (frame 0 is zeros).
+- All fields in a model share one `grid`; frames share the same `fhr` list per field where possible.
+- Pressure-level winds required in round 2: 850, 700, 500, 300, 250 hPa (+ 10 m).
+
 ## 2. Storms (producer: D · consumers: A)
 
 ```
@@ -122,3 +159,26 @@ Client env: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`.
   it never hides the map. Constants live in one config module.
 - Signed-in-only features (stubbed in M0): save place/view, follow storm, run analysis export.
 - The gate is a prompt, not security — protected data stays behind RLS.
+
+
+## 6. Lightning (producer: lightning ingest · consumer: web app)
+
+```
+public-data/lightning/index.json        # pointer + provenance + coverage, written last
+public-data/lightning/flashes.json      # recent flashes, compact column form
+public-data/lightning/coverage.geojson  # footprint where the source can see lightning (Polygon/MultiPolygon)
+```
+`index.json`: `{"schema":1,"generated":"…Z","updated":"…Z","window_minutes":60,"count":N,
+"sources":[{"id":"goes-glm","name":"NOAA GOES GLM (G16/G18/G19)","licence":"NOAA open data (public domain)","satellites":["G19","G18"],
+"latency_s":60,"coverage":"lightning/coverage.geojson"}],
+"notes":"Coverage: Americas, Atlantic and eastern Pacific. No open real-time lightning feed covers South Asia."}`
+
+`flashes.json`: `{"schema":1,"t0":"2026-11-01T19:00:00Z","cols":["dt_s","lon","lat","energy_fj"],"rows":[[0,-84.12,29.4,310.0], …]}`
+sorted by time, `dt_s` = seconds since `t0`, lon/lat rounded to 2 dp. Cap ≈ 100 000 rows (decimate
+uniformly in time when exceeded and say so in `index.notes`). Missing/stale source → keep the previous files
+and set `index.stale: true`; never publish an empty file because a download failed.
+Always show the coverage footprint in the UI; never imply "no lightning" where there is no coverage.
+
+## 7. Weather ingest runtime notes
+Jobs must run on a clean Linux machine with no system libraries (see the eccodes lesson: declare native
+dependencies as wheels), use no absolute local paths, and pass `ruff check` / `ruff format --check` with the repo's `ruff.toml`.

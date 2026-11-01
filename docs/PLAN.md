@@ -86,6 +86,30 @@ embeddable widgets, public API.
 | D | Storms & hazards data | `services/ingest/storms/`, `services/ingest/hazards/`, `services/api/` | Jobs producing storm + hazard files per CONTRACTS §2–3 using `stormtrack`; a minimal FastAPI skeleton |
 | E | Auth, DB & infra | `supabase/`, `.github/workflows/`, `docs/DEPLOY.md`, `infra/` | Supabase migrations + RLS + local config; CI; scheduled-ingest workflow; Cloudflare/R2/Render configs and a deploy guide |
 
+## Round 2 (M2a): decisions
+
+Chosen for "next-gen, fast, interactive", in priority order. Everything stays on the existing
+architecture (static files on a CDN, WebGL2 on the GPU, MapLibre globe); we do **not** adopt WebGPU
+(MapLibre has no stable WebGPU path, and WebGL2 already runs 1M particles at 60 fps here).
+
+1. **Models and levels as first-class controls.** NOAA GFS and ECMWF **IFS** and **AIFS** (ECMWF's
+   AI forecast model, open data) switchable in one click; winds at 10 m, 850, 700, 500, 300, 250 hPa.
+   The same time slider drives everything.
+2. **More scalar layers:** mean sea-level pressure (with **isobars** drawn client-side), 2 m
+   temperature, precipitation. Rendered as colour-mapped GPU textures; isobars via marching squares in a
+   Web Worker.
+3. **Click anywhere → instant meteogram** (wind/pressure/temp/precip vs time for that point),
+   computed from the frames already in memory: zero API calls, zero latency. A genuine differentiator.
+4. **Lightning layer** from NOAA GOES GLM (open, 20 s cadence). It covers the **Americas, Atlantic
+   and eastern Pacific only**. The UI must show the coverage footprint and say plainly that there
+   is no open real-time feed for South Asia. Not used: Blitzortung (terms forbid commercial/warning use,
+   no external API); MTG Lightning Imager is a later add (needs a free EUMETSAT key; Europe/Africa/Middle East).
+5. **Speed plumbing:** prefetch the next frames, decode on a worker (`createImageBitmap` off-thread),
+   cache frames with a service worker, and keep all view state in the URL so any view is a shareable link.
+
+Later (M3): ECMWF-based multi-model comparison, balloon soundings, satellite/radar, storm alerts,
+an AI "storm brief" summary.
+
 ## Needs from the owner (agents cannot do these)
 - Create the **Supabase** project (agents write migrations and a local dev setup).
 - Create **Cloudflare** account resources (Pages project, R2 bucket + API token) and a
