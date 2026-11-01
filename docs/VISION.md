@@ -45,7 +45,13 @@ It is fast, beautiful, a little alive, and honest about what it knows.
 6. Scientist mode, embeds, API.
 
 ## Open decisions for the owner
-- Product name and domain; whether the brand is AtmosPy or StormTrack-first.
+- **Name (decided 2026-11-02: working name "StormTrack", AtmosPy as the org/maker).** Risk found the same day: *StormTrack* is already
+  used for weather products: **StormTrack 5** (Sinclair Broadcast Group's US TV-station weather app), **StormTrack** by Tempest/WeatherFlow
+  (a professional storm-monitoring tool), an iOS app named StormTrack, and the stormtrack.org severe-weather community (since 1977).
+  Not a legal opinion; before launching publicly or publishing mobile apps, run a proper trademark search (USPTO and the Indian Trademarks Registry)
+  and consider a more distinctive consumer name (keeping `stormtrack` for the open-source library). Domains: stormtrack.io/.org/.net/.ai/.live
+  are registered; .com/.app/.dev/.in/.earth had no DNS records on 2026-11-02 (not proof they are available: check a registrar).
+- Domain: where it will live (the owner proposed stormtrack.labshope.com first).
 - Permission route for India lightning (IITM) and for any global lightning licence.
 - Whether AI features should exist at launch, and the budget for their API calls.
 - Free vs paid: what stays free forever (the globe) and what could be an account feature (alerts, exports).
