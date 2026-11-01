@@ -5,18 +5,21 @@ import os
 import numpy as np
 import pytest
 from PIL import Image
-
 from stormtrack_ingest_wind import encode, fixtures, gfs, grib, grid, pipeline, upload, verify
 
 UTC = dt.timezone.utc
 
 
 def test_idx_ranges_merge_and_exact():
-    idx = gfs.parse_idx("1:0:d=x:TMP:2 m above ground:anl:\n2:100:d=x:UGRD:10 m above ground:anl:\n"
-                        "3:300:d=x:VGRD:10 m above ground:anl:\n4:450:d=x:ICEG:10 m above mean sea level:anl:\n")
+    idx = gfs.parse_idx(
+        "1:0:d=x:TMP:2 m above ground:anl:\n2:100:d=x:UGRD:10 m above ground:anl:\n"
+        "3:300:d=x:VGRD:10 m above ground:anl:\n4:450:d=x:ICEG:10 m above mean sea level:anl:\n"
+    )
     assert gfs.uv_ranges(idx) == [(100, 449)]
-    idx2 = gfs.parse_idx("1:100:d=x:UGRD:10 m above ground:anl:\n2:150:d=x:FOO:x:anl:\n"
-                         "3:300:d=x:VGRD:10 m above ground:anl:\n")
+    idx2 = gfs.parse_idx(
+        "1:100:d=x:UGRD:10 m above ground:anl:\n2:150:d=x:FOO:x:anl:\n"
+        "3:300:d=x:VGRD:10 m above ground:anl:\n"
+    )
     assert gfs.uv_ranges(idx2) == [(100, 149), (300, None)]
 
 
@@ -82,7 +85,9 @@ def test_pipeline_end_to_end_idempotent_prune(fake_noaa, tmp_path):
         os.makedirs(tmp_path / "wind" / old)
     lat = pipeline.ingest(out, run=run, hours=12, step=3, res=4.0)
     assert [f["fhr"] for f in lat["frames"]] == [0, 3, 6, 9, 12]
-    assert lat["run"] == "2026-11-01T06:00:00Z" and lat["frames"][1]["valid"] == "2026-11-01T09:00:00Z"
+    assert (
+        lat["run"] == "2026-11-01T06:00:00Z" and lat["frames"][1]["valid"] == "2026-11-01T09:00:00Z"
+    )
     assert lat["image"]["width"] == 90 and lat["image"]["lon_right"] == 176
     disk = json.load(open(tmp_path / "wind" / "latest.json"))
     assert disk == lat and disk["frames"][0]["png"] == "wind/20261101T06/f000.png"
@@ -109,8 +114,17 @@ def test_no_run_raises(fake_noaa):
 
 
 def test_dry_run_writes_nothing(fake_noaa, tmp_path):
-    assert pipeline.ingest(str(tmp_path), run=dt.datetime(2026, 11, 1, 6, tzinfo=UTC),
-                           hours=3, step=3, res=4.0, dry_run=True) is None
+    assert (
+        pipeline.ingest(
+            str(tmp_path),
+            run=dt.datetime(2026, 11, 1, 6, tzinfo=UTC),
+            hours=3,
+            step=3,
+            res=4.0,
+            dry_run=True,
+        )
+        is None
+    )
     assert os.listdir(tmp_path) == []
 
 
@@ -124,8 +138,13 @@ class FakeS3:
 
     def list_objects_v2(self, Bucket, Prefix, Delimiter=None):
         if Delimiter:
-            ps = sorted({Prefix + k[len(Prefix):].split("/")[0] + "/" for k in self.objs
-                         if k.startswith(Prefix) and "/" in k[len(Prefix):]})
+            ps = sorted(
+                {
+                    Prefix + k[len(Prefix) :].split("/")[0] + "/"
+                    for k in self.objs
+                    if k.startswith(Prefix) and "/" in k[len(Prefix) :]
+                }
+            )
             return {"CommonPrefixes": [{"Prefix": p} for p in ps]}
         return {"Contents": [{"Key": k} for k in self.objs if k.startswith(Prefix)]}
 
@@ -144,7 +163,10 @@ def test_upload_order_prune_headers(fake_noaa, tmp_path):
     assert n == 3 and s3.calls[-1] == "p/wind/latest.json"  # pointer last
     assert s3.objs["p/wind/20261101T06/f000.png"][1]["ContentType"] == "image/png"
     assert "immutable" in s3.objs["p/wind/20261101T06/f000.png"][1]["CacheControl"]
-    assert "p/wind/20261030T00/f000.png" not in s3.objs and "p/wind/20261031T00/f000.png" not in s3.objs
+    assert (
+        "p/wind/20261030T00/f000.png" not in s3.objs
+        and "p/wind/20261031T00/f000.png" not in s3.objs
+    )
     assert "p/wind/20261031T06/f000.png" in s3.objs
 
 
@@ -155,6 +177,7 @@ def test_upload_requires_env():
 
 def test_selftest():
     from stormtrack_ingest_wind.selftest import run_selftest
+
     assert run_selftest() == 0
 
 
@@ -162,6 +185,7 @@ def test_selftest():
 def test_real_gfs_one_frame(tmp_path):
     """Real NOAA bucket: latest run f000, byte-range only, ~2 MB download, full verification."""
     from stormtrack_ingest_wind import http
+
     now = dt.datetime.now(UTC)
     run = gfs.find_latest_run(now, [0])
     http.STATS.update(bytes=0, requests=0)

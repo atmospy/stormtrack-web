@@ -21,15 +21,31 @@ DEFAULT_CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) /
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(prog="ingest-storms", description=__doc__)
-    ap.add_argument("--out", default=os.environ.get("STORMS_OUT", DEFAULT_OUT), help="public-data directory")
-    ap.add_argument("--basin", default="NI", help="IBTrACS basin code for history/stats (default NI; "
-                    "others download a large NCEI file, see README)")
-    ap.add_argument("--only", choices=["all", "active", "history"], default="all",
-                    help="run just the live part (cron, every 30 min) or just history+stats (rarely)")
-    ap.add_argument("--cache-dir", default=str(DEFAULT_CACHE), help="cache for cone-radius error samples")
-    ap.add_argument("--cone-years", type=int, default=2, help="completed seasons used for cone radii")
+    ap.add_argument(
+        "--out", default=os.environ.get("STORMS_OUT", DEFAULT_OUT), help="public-data directory"
+    )
+    ap.add_argument(
+        "--basin",
+        default="NI",
+        help="IBTrACS basin code for history/stats (default NI; "
+        "others download a large NCEI file, see README)",
+    )
+    ap.add_argument(
+        "--only",
+        choices=["all", "active", "history"],
+        default="all",
+        help="run just the live part (cron, every 30 min) or just history+stats (rarely)",
+    )
+    ap.add_argument(
+        "--cache-dir", default=str(DEFAULT_CACHE), help="cache for cone-radius error samples"
+    )
+    ap.add_argument(
+        "--cone-years", type=int, default=2, help="completed seasons used for cone radii"
+    )
     ap.add_argument("--no-cone", action="store_true", help="skip the (cached) cone-radius estimate")
-    ap.add_argument("--upload", action="store_true", help="upload written files to R2 (needs R2_* env vars)")
+    ap.add_argument(
+        "--upload", action="store_true", help="upload written files to R2 (needs R2_* env vars)"
+    )
     ap.add_argument("-v", "--verbose", action="store_true")
     return ap.parse_args(argv)
 
@@ -63,8 +79,14 @@ def run_history(out: Path, basin: str, written: list) -> dict:
     hp = out / "storms" / "history" / f"{basin}.geojson"
     size = write_json(hp, coll)
     written.append(hp.relative_to(out).as_posix())
-    log.info("history %s: %d storms (%d skipped <2 fixes), %.2f MB raw, %.0f kB gzip", basin,
-             len(coll["features"]), len(skipped), size / 1e6, gz_size(hp) / 1e3)
+    log.info(
+        "history %s: %d storms (%d skipped <2 fixes), %.2f MB raw, %.0f kB gzip",
+        basin,
+        len(coll["features"]),
+        len(skipped),
+        size / 1e6,
+        gz_size(hp) / 1e3,
+    )
 
     stats = build_stats(obs, basin)
     errs = validate_stats(stats)
@@ -74,8 +96,12 @@ def run_history(out: Path, basin: str, written: list) -> dict:
     write_json(sp, stats)
     written.append(sp.relative_to(out).as_posix())
     log.info("stats %s written (%.1fs total)", basin, time.time() - t0)
-    return {"count": len(coll["features"]), "year_min": int(obs["year"].min()), "year_max": int(obs["year"].max()),
-            "sources": sources}
+    return {
+        "count": len(coll["features"]),
+        "year_min": int(obs["year"].min()),
+        "year_max": int(obs["year"].max()),
+        "sources": sources,
+    }
 
 
 def run_active(out: Path, args, written: list):
@@ -100,16 +126,23 @@ def run_active(out: Path, args, written: list):
     ap = out / "storms" / "active.geojson"
     write_json(ap, coll)
     written.append(ap.relative_to(out).as_posix())
-    log.info("active: %d storms %s; forecasts ok %s, unavailable %s; failed sources %s",
-             len(report["storms"]), [(s["id"], s["name"]) for s in report["storms"]],
-             report["forecast_ok"], report["forecast_unavailable"], report["failed"])
+    log.info(
+        "active: %d storms %s; forecasts ok %s, unavailable %s; failed sources %s",
+        len(report["storms"]),
+        [(s["id"], s["name"]) for s in report["storms"]],
+        report["forecast_ok"],
+        report["forecast_unavailable"],
+        report["failed"],
+    )
     return report
 
 
 def main(argv=None) -> int:
     args = parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                        format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
     out = Path(args.out)
     basin = args.basin.upper()
     prev = _read_json(out / "storms" / "index.json") or {}
@@ -124,7 +157,8 @@ def main(argv=None) -> int:
         try:
             rep = run_active(out, args, written)
             active_block = {
-                "count": len(rep["storms"]), "updated": now_iso(),
+                "count": len(rep["storms"]),
+                "updated": now_iso(),
                 "sources": [{"nhc": "NHC", "jtwc": "JTWC"}[s] for s in rep["ok"]],
                 "failed_sources": sorted(rep["failed"]),
                 "forecast_unavailable": rep["forecast_unavailable"],
@@ -166,7 +200,12 @@ def main(argv=None) -> int:
 
         keys = upload_files(out, written)
         log.info("uploaded %d objects to R2: %s", len(keys), keys)
-    log.info("done in %.0fs; %d failure(s) of %d component(s)", time.time() - t_start, failures, attempted)
+    log.info(
+        "done in %.0fs; %d failure(s) of %d component(s)",
+        time.time() - t_start,
+        failures,
+        attempted,
+    )
     return 0
 
 

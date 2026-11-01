@@ -25,13 +25,20 @@ DEFAULT_OUT = "/Users/syed44/Git_Stuff/Git_Projects/stormtrack-web/public-data"
 
 def main(argv=None, env=os.environ, fetchers=None) -> int:
     ap = argparse.ArgumentParser(prog="ingest-hazards", description=__doc__)
-    ap.add_argument("--out", default=env.get("HAZARDS_OUT", DEFAULT_OUT), help="public-data directory")
-    ap.add_argument("--eonet-days", type=int, default=30, help="EONET: events with activity in the last N days")
+    ap.add_argument(
+        "--out", default=env.get("HAZARDS_OUT", DEFAULT_OUT), help="public-data directory"
+    )
+    ap.add_argument(
+        "--eonet-days", type=int, default=30, help="EONET: events with activity in the last N days"
+    )
     ap.add_argument("--firms-days", type=int, default=1)
     ap.add_argument("--upload", action="store_true", help="upload to R2 (needs R2_* env vars)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
     out = Path(args.out)
     hz = out / "hazards"
 
@@ -39,8 +46,11 @@ def main(argv=None, env=os.environ, fetchers=None) -> int:
         "events": lambda: sources.fetch_eonet(args.eonet_days),
         "quakes": sources.fetch_usgs,
     }
-    meta = {"events": ("NASA EONET", "https://eonet.gsfc.nasa.gov/"), "quakes": ("USGS", "https://earthquake.usgs.gov/earthquakes/feed/"),
-            "fires": ("NASA FIRMS", "https://firms.modaps.eosdis.nasa.gov/")}
+    meta = {
+        "events": ("NASA EONET", "https://eonet.gsfc.nasa.gov/"),
+        "quakes": ("USGS", "https://earthquake.usgs.gov/earthquakes/feed/"),
+        "fires": ("NASA FIRMS", "https://firms.modaps.eosdis.nasa.gov/"),
+    }
     key = env.get("FIRMS_MAP_KEY")
     if key:
         f["fires"] = lambda: sources.fetch_firms(key, args.firms_days)
@@ -65,9 +75,21 @@ def main(argv=None, env=os.environ, fetchers=None) -> int:
             p = hz / f"{name}.geojson"
             size = write_json(p, fc)
             written.append(f"hazards/{name}.geojson")
-            layers[name] = {"count": len(fc["features"]), "source": meta[name][0], "url": meta[name][1],
-                            "licence": fc.get("licence"), "updated": now_iso()}
-            log.info("%s: %d features, %.0f kB (%.0f kB gzip) in %.1fs", name, len(fc["features"]), size / 1e3, gz_size(p) / 1e3, time.time() - t0)
+            layers[name] = {
+                "count": len(fc["features"]),
+                "source": meta[name][0],
+                "url": meta[name][1],
+                "licence": fc.get("licence"),
+                "updated": now_iso(),
+            }
+            log.info(
+                "%s: %d features, %.0f kB (%.0f kB gzip) in %.1fs",
+                name,
+                len(fc["features"]),
+                size / 1e3,
+                gz_size(p) / 1e3,
+                time.time() - t0,
+            )
         except Exception as exc:  # noqa: BLE001
             failed[name] = f"{type(exc).__name__}: {exc}"[:300]
             log.error("%s failed: %s", name, failed[name])

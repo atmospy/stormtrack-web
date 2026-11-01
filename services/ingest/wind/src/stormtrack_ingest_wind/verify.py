@@ -1,4 +1,5 @@
 """Correctness checks: PNG round trip vs source field, and physical sanity."""
+
 from __future__ import annotations
 
 import argparse
@@ -17,10 +18,17 @@ def roundtrip_error(png: bytes, u: np.ndarray, v: np.ndarray) -> dict:
     du, dv, ds = encode.decode_png(png)
     uc, vc = np.clip(u, -50, 50), np.clip(v, -50, 50)
     sp = np.minimum(np.hypot(u, v), encode.SPEED_MAX)
-    return {"u": float(np.abs(du - uc).max()), "v": float(np.abs(dv - vc).max()),
-            "speed": float(np.abs(ds - sp).max()), "step": QSTEP, "limit": QSTEP / 2 + 1e-4,
-            "ok": bool(max(np.abs(du - uc).max(), np.abs(dv - vc).max()) <= QSTEP / 2 + 1e-4
-                       and np.abs(ds - sp).max() <= encode.SPEED_MAX / 255 / 2 + 1e-4)}
+    return {
+        "u": float(np.abs(du - uc).max()),
+        "v": float(np.abs(dv - vc).max()),
+        "speed": float(np.abs(ds - sp).max()),
+        "step": QSTEP,
+        "limit": QSTEP / 2 + 1e-4,
+        "ok": bool(
+            max(np.abs(du - uc).max(), np.abs(dv - vc).max()) <= QSTEP / 2 + 1e-4
+            and np.abs(ds - sp).max() <= encode.SPEED_MAX / 255 / 2 + 1e-4
+        ),
+    }
 
 
 def sanity(u: np.ndarray, v: np.ndarray) -> dict:
@@ -35,9 +43,15 @@ def sanity(u: np.ndarray, v: np.ndarray) -> dict:
         m = np.abs(lat - c) <= 2.5
         return float(u[m].mean())
 
-    r = {"max_speed": float(sp.max()), "mean_speed_area_weighted": mean_sp,
-         "mean_u_45N": band(45), "mean_u_10N": band(10)}
-    r["ok"] = bool(r["max_speed"] < 70 and 3 <= mean_sp <= 9 and r["mean_u_45N"] > 0 and r["mean_u_10N"] < 0)
+    r = {
+        "max_speed": float(sp.max()),
+        "mean_speed_area_weighted": mean_sp,
+        "mean_u_45N": band(45),
+        "mean_u_10N": band(10),
+    }
+    r["ok"] = bool(
+        r["max_speed"] < 70 and 3 <= mean_sp <= 9 and r["mean_u_45N"] > 0 and r["mean_u_10N"] < 0
+    )
     return r
 
 
@@ -53,14 +67,18 @@ def point(png: bytes, lat: float, lon: float):
 
 def main(argv=None) -> int:
     from .cli import default_out
-    ap = argparse.ArgumentParser(prog="verify-wind",
-                                 description="Re-download source GRIB for published frames and compare to the PNGs.")
+
+    ap = argparse.ArgumentParser(
+        prog="verify-wind",
+        description="Re-download source GRIB for published frames and compare to the PNGs.",
+    )
     ap.add_argument("--out", default=None)
     ap.add_argument("--fhr", type=int, nargs="*", default=[0, 24, 72])
     ap.add_argument("--method", default="nearest")
     a = ap.parse_args(argv)
+
     from . import gfs, grib, grid
-    import datetime as dt
+
     out = a.out or default_out()
     latest = json.load(open(os.path.join(out, "wind", "latest.json")))
     run = gfs.parse_run(latest["run"][:13])
@@ -74,8 +92,10 @@ def main(argv=None) -> int:
         u, v, _ = grid.resample(f, res, a.method)
         png = open(os.path.join(out, fr["png"]), "rb").read()
         rt, sn = roundtrip_error(png, u, v), sanity(u, v)
-        print(f"f{fhr:03d} roundtrip max|err| u={rt['u']:.3f} v={rt['v']:.3f} speed={rt['speed']:.3f} "
-              f"(limit {rt['limit']:.3f}) ok={rt['ok']}")
+        print(
+            f"f{fhr:03d} roundtrip max|err| u={rt['u']:.3f} v={rt['v']:.3f} speed={rt['speed']:.3f} "
+            f"(limit {rt['limit']:.3f}) ok={rt['ok']}"
+        )
         print(f"      sanity {json.dumps(sn)}")
         bad += (not rt["ok"]) + (not sn["ok"])
     return 1 if bad else 0

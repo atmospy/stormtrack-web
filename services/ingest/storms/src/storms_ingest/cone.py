@@ -18,14 +18,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import pandas as pd
-from shapely.geometry import MultiPolygon, Polygon, box
-from shapely.ops import unary_union
 from shapely.affinity import translate
+from shapely.geometry import Polygon, box
 from shapely.geometry.polygon import orient
-
-import stormtrack as st
+from shapely.ops import unary_union
 from stormtrack import verification as V
 from stormtrack.atcf import best_track_frame, parse_atcf
 
@@ -63,7 +60,9 @@ def list_season_storms(year: int, timeout: float = 60.0, fetch=None) -> list:
 _COLS = ["atcf_id", "init", "tau", "track_err_km"]
 
 
-def score_storm(year: int, basin: str, cy: str, fetch=_get, cache_dir: Optional[Path] = None) -> Optional[pd.DataFrame]:
+def score_storm(
+    year: int, basin: str, cy: str, fetch=_get, cache_dir: Optional[Path] = None
+) -> Optional[pd.DataFrame]:
     """OFCL track errors for one archived storm.
 
     Cached per storm (a finished storm's archive never changes), so an interrupted run
@@ -92,7 +91,9 @@ def score_storm(year: int, basin: str, cy: str, fetch=_get, cache_dir: Optional[
     return out
 
 
-def season_errors(year: int, cache_dir: Optional[Path], fetch=_get, workers: int = 4) -> pd.DataFrame:
+def season_errors(
+    year: int, cache_dir: Optional[Path], fetch=_get, workers: int = 4
+) -> pd.DataFrame:
     """OFCL errors for a completed season (storms that failed to download are skipped
     this run and retried on the next one)."""
     storms = list_season_storms(year, fetch=fetch)
@@ -105,10 +106,16 @@ def season_errors(year: int, cache_dir: Optional[Path], fetch=_get, workers: int
     return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=_COLS)
 
 
-def estimate_radii(errors: pd.DataFrame, years: list, pct: float = 67.0, min_n: int = MIN_N) -> dict:
+def estimate_radii(
+    errors: pd.DataFrame, years: list, pct: float = 67.0, min_n: int = MIN_N
+) -> dict:
     """Radii (km) by lead time + provenance from a pooled error sample."""
     errors = errors[errors["tau"] > 0] if len(errors) else errors
-    r = V.error_radii(errors, pct=pct, min_n=min_n, units="km") if len(errors) else pd.Series(dtype=float)
+    r = (
+        V.error_radii(errors, pct=pct, min_n=min_n, units="km")
+        if len(errors)
+        else pd.Series(dtype=float)
+    )
     n_by_tau = errors.groupby("tau").size() if len(errors) else pd.Series(dtype=int)
     if r.empty:
         basis = (
@@ -133,8 +140,12 @@ def estimate_radii(errors: pd.DataFrame, years: list, pct: float = 67.0, min_n: 
     }
 
 
-def build_radii(cache_dir: Optional[Path], years_back: int = DEFAULT_YEARS, now_year: Optional[int] = None,
-                fetch=_get) -> dict:
+def build_radii(
+    cache_dir: Optional[Path],
+    years_back: int = DEFAULT_YEARS,
+    now_year: Optional[int] = None,
+    fetch=_get,
+) -> dict:
     """Pool the last ``years_back`` completed seasons' OFCL errors into cone radii."""
     now_year = now_year or pd.Timestamp.utcnow().year
     years = [now_year - k for k in range(1, years_back + 1)]
@@ -144,7 +155,11 @@ def build_radii(cache_dir: Optional[Path], years_back: int = DEFAULT_YEARS, now_
             frames.append(season_errors(y, cache_dir, fetch))
         except Exception as exc:  # noqa: BLE001
             log.warning("could not score season %s: %s", y, exc)
-    errors = pd.concat([f for f in frames if len(f)], ignore_index=True) if any(len(f) for f in frames) else pd.DataFrame()
+    errors = (
+        pd.concat([f for f in frames if len(f)], ignore_index=True)
+        if any(len(f) for f in frames)
+        else pd.DataFrame()
+    )
     return estimate_radii(errors, years)
 
 
@@ -159,7 +174,11 @@ def _wrap_polygon(geom) -> list:
         part = translate(geom, xoff=shift).intersection(world)
         if part.is_empty:
             continue
-        pieces += [part] if isinstance(part, Polygon) else [g for g in getattr(part, "geoms", []) if isinstance(g, Polygon)]
+        pieces += (
+            [part]
+            if isinstance(part, Polygon)
+            else [g for g in getattr(part, "geoms", []) if isinstance(g, Polygon)]
+        )
     return pieces
 
 

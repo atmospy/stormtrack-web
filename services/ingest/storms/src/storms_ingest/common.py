@@ -14,7 +14,15 @@ from typing import Iterable, Optional, Sequence
 import pandas as pd
 
 # Saffir-Simpson lower bounds in knots (1-minute sustained wind). Order matters.
-SAFFIR_SIMPSON = [("TD", 0), ("TS", 34), ("C1", 64), ("C2", 83), ("C3", 96), ("C4", 113), ("C5", 137)]
+SAFFIR_SIMPSON = [
+    ("TD", 0),
+    ("TS", 34),
+    ("C1", 64),
+    ("C2", 83),
+    ("C3", 96),
+    ("C4", 113),
+    ("C5", 137),
+]
 CATEGORY_LABELS = [lab for lab, _ in SAFFIR_SIMPSON]
 
 

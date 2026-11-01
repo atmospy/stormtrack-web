@@ -1,4 +1,5 @@
 """Tiny stdlib HTTP layer with retries/backoff. Tests monkeypatch `get`/`head`."""
+
 from __future__ import annotations
 
 import logging

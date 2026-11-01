@@ -1,7 +1,6 @@
 import datetime as dt
 
 import pytest
-
 from stormtrack_ingest_wind import fixtures, http
 
 RUN = dt.datetime(2026, 11, 1, 6, tzinfo=dt.timezone.utc)
@@ -26,7 +25,7 @@ def fake_noaa(monkeypatch):
         if url.endswith(".idx"):
             return idx.encode()
         a, b = byte_range
-        return body[a:(b + 1) if b is not None else None]
+        return body[a : (b + 1) if b is not None else None]
 
     monkeypatch.setattr(http, "head", head)
     monkeypatch.setattr(http, "get", get)

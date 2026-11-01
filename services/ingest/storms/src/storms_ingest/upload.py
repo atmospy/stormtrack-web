@@ -23,12 +23,17 @@ def make_client(env=os.environ):
     import boto3
 
     endpoint = env.get("R2_ENDPOINT") or (
-        f"https://{env['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com" if env.get("R2_ACCOUNT_ID") else None
+        f"https://{env['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com"
+        if env.get("R2_ACCOUNT_ID")
+        else None
     )
-    missing = [k for k in ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET") if not env.get(k)]
+    missing = [
+        k for k in ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET") if not env.get(k)
+    ]
     if missing or not endpoint:
         raise RuntimeError(
-            "R2 upload needs " + ", ".join(missing + ([] if endpoint else ["R2_ACCOUNT_ID or R2_ENDPOINT"]))
+            "R2 upload needs "
+            + ", ".join(missing + ([] if endpoint else ["R2_ACCOUNT_ID or R2_ENDPOINT"]))
         )
     return boto3.client(
         "s3",

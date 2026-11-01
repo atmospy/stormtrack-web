@@ -1,0 +1,8 @@
+# One explicit lint/format config for all Python services (do not rely on ruff's changing defaults).
+line-length = 100
+target-version = "py39"          # the wind job supports 3.9; don't rewrite syntax older Pythons can't run
+extend-exclude = ["**/.venv", "**/node_modules", "**/build"]
+
+[lint]
+select = ["E", "F", "I"]         # pycodestyle errors, pyflakes, import order
+ignore = ["E501"]                # the formatter wraps code; long strings/comments are left alone

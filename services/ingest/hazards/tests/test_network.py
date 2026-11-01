@@ -1,5 +1,4 @@
 import pytest
-
 from hazards_ingest import sources
 from hazards_ingest.validate import validate_collection
 

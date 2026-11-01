@@ -64,15 +64,34 @@ def active_geojson(fetch_active: Callable) -> dict:
             o = o.sort_values("time")
             last = o.iloc[-1]
             w = _f(last["wind"], 0)
-            feats.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": [round(float(last["lon"]), 3), round(float(last["lat"]), 3)]},
-                          "properties": {"kind": "position", "id": sid, "name": None if pd.isna(last["name"]) else str(last["name"]),
-                                         "agency": agency, "time": _iso(last["time"]), "wind_kt": w, "wind_period_min": 1,
-                                         "pressure_hpa": _f(last["pressure"], 0),
-                                         "category": None if w is None else {"scale": "saffir-simpson", "label": category(w)}}})
+            feats.append(
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [round(float(last["lon"]), 3), round(float(last["lat"]), 3)],
+                    },
+                    "properties": {
+                        "kind": "position",
+                        "id": sid,
+                        "name": None if pd.isna(last["name"]) else str(last["name"]),
+                        "agency": agency,
+                        "time": _iso(last["time"]),
+                        "wind_kt": w,
+                        "wind_period_min": 1,
+                        "pressure_hpa": _f(last["pressure"], 0),
+                        "category": None
+                        if w is None
+                        else {"scale": "saffir-simpson", "label": category(w)},
+                    },
+                }
+            )
     return {"type": "FeatureCollection", "sources": sources, "failed": failed, "features": feats}
 
 
-def summarize(obs: pd.DataFrame, storm_id: str, wind_period_min: Optional[int], source: str) -> dict:
+def summarize(
+    obs: pd.DataFrame, storm_id: str, wind_period_min: Optional[int], source: str
+) -> dict:
     """Lifetime summary of one storm using stormtrack.analysis."""
     from stormtrack import analysis as A
 
@@ -91,14 +110,22 @@ def summarize(obs: pd.DataFrame, storm_id: str, wind_period_min: Optional[int], 
         "end": _iso(lm["end_time"]),
         "duration_days": _f(lm["duration_days"], 2),
         "n_fixes": int(len(o)),
-        "peak": {"wind_kt": peak, "category": category(peak), "time": _iso(lm["lmi_time"]),
-                 "lat": _f(lm["lmi_lat"], 2), "lon": _f(lm["lmi_lon"], 2)},
+        "peak": {
+            "wind_kt": peak,
+            "category": category(peak),
+            "time": _iso(lm["lmi_time"]),
+            "lat": _f(lm["lmi_lat"], 2),
+            "lon": _f(lm["lmi_lon"], 2),
+        },
         "min_pressure_hpa": _f(lm["min_pressure"], 0),
         "genesis": {"lat": _f(lm["genesis_lat"], 2), "lon": _f(lm["genesis_lon"], 2)},
         "ace": round(float(ace["ace"].sum()), 2) if len(ace) else 0.0,
         "max_dwind_kt_24h": _f(ri["max_dwind"].iloc[0], 0) if len(ri) else None,
         "rapid_intensification": bool(ri["rapid"].iloc[0]) if len(ri) else False,
-        "caveat": ("1-minute sustained wind (NHC/JTWC)." if wind_period_min == 1 else
-                   "IBTrACS merged wind: IMD 3-minute where available, else JTWC 1-minute; "
-                   "not directly comparable across agencies."),
+        "caveat": (
+            "1-minute sustained wind (NHC/JTWC)."
+            if wind_period_min == 1
+            else "IBTrACS merged wind: IMD 3-minute where available, else JTWC 1-minute; "
+            "not directly comparable across agencies."
+        ),
     }

@@ -26,7 +26,9 @@ def _default_history():
     return st.load_ibtracs().observations
 
 
-def create_app(fetch_active: Optional[Callable] = None, load_history: Optional[Callable] = None) -> FastAPI:
+def create_app(
+    fetch_active: Optional[Callable] = None, load_history: Optional[Callable] = None
+) -> FastAPI:
     """``fetch_active(src)`` / ``load_history()`` are injectable for tests."""
     fetch_active = fetch_active or _default_fetch_active
     load_history = load_history or _default_history
@@ -34,8 +36,14 @@ def create_app(fetch_active: Optional[Callable] = None, load_history: Optional[C
     app = FastAPI(title="StormTrack API", version="0.1.0")
     origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
     if origins:  # no CORS headers at all unless origins are configured
-        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET"], allow_headers=["*"],
-                           allow_credentials=False, max_age=3600)
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_methods=["GET"],
+            allow_headers=["*"],
+            allow_credentials=False,
+            max_age=3600,
+        )
 
     @app.get("/healthz")
     def healthz():
@@ -60,7 +68,9 @@ def create_app(fetch_active: Optional[Callable] = None, load_history: Optional[C
                 except Exception:  # noqa: BLE001
                     continue
                 if (bt.observations["storm_id"] == storm_id).any():
-                    return service.summarize(bt.observations, storm_id, 1, f"ATCF {src.upper()} best track (active)")
+                    return service.summarize(
+                        bt.observations, storm_id, 1, f"ATCF {src.upper()} best track (active)"
+                    )
             return None
 
         result = cache.get_or_set(("summary", storm_id), SUMMARY_TTL, compute)

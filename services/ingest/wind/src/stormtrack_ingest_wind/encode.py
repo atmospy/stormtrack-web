@@ -1,4 +1,5 @@
 """PNG encoding per docs/CONTRACTS.md section 1."""
+
 from __future__ import annotations
 
 import io

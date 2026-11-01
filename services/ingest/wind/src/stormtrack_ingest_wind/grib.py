@@ -2,13 +2,13 @@
 
 Output is normalised to: north-first rows, longitudes -180..180 ascending.
 """
+
 from __future__ import annotations
 
 import struct
+import warnings
 from dataclasses import dataclass
 from typing import Dict, List
-
-import warnings
 
 import numpy as np
 
@@ -28,10 +28,10 @@ class Field:
 def split_messages(buf: bytes) -> List[bytes]:
     out, p = [], 0
     while p < len(buf):
-        if buf[p:p + 4] != b"GRIB":
+        if buf[p : p + 4] != b"GRIB":
             raise ValueError(f"bad GRIB magic at {p}")
-        n = struct.unpack(">Q", buf[p + 8:p + 16])[0]
-        out.append(buf[p:p + n])
+        n = struct.unpack(">Q", buf[p + 8 : p + 16])[0]
+        out.append(buf[p : p + n])
         p += n
     return out
 

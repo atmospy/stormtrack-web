@@ -12,7 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-UA = {"User-Agent": "stormtrack-web-ingest (https://github.com/atmospy/stormtrack-web)", "Accept-Encoding": "gzip"}
+UA = {
+    "User-Agent": "stormtrack-web-ingest (https://github.com/atmospy/stormtrack-web)",
+    "Accept-Encoding": "gzip",
+}
 
 
 def now_iso() -> str:

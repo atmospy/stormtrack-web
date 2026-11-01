@@ -1,4 +1,5 @@
 """Locate a complete GFS run and fetch only the 10 m U/V GRIB2 records."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -15,8 +16,7 @@ WANT = ("UGRD:10 m above ground", "VGRD:10 m above ground")
 
 
 def base_url(run: dt.datetime, fhr: int) -> str:
-    return (f"{BUCKET}/gfs.{run:%Y%m%d}/{run:%H}/atmos/"
-            f"gfs.t{run:%H}z.pgrb2.0p25.f{fhr:03d}")
+    return f"{BUCKET}/gfs.{run:%Y%m%d}/{run:%H}/atmos/gfs.t{run:%H}z.pgrb2.0p25.f{fhr:03d}"
 
 
 def run_id(run: dt.datetime) -> str:

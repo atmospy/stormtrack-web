@@ -1,4 +1,5 @@
 """Resample a source Field to the contract grid."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -50,6 +51,12 @@ def resample(f: Field, res: float, method: str = "nearest"):
     # nearest: every Nth point, starting at the north pole row and lon -180
     u, v = u[::n, ::n], v[::n, ::n]
     h, w = u.shape
-    g = Grid(w, h, float(f.lons[0]), float(f.lons[0] + (w - 1) * res),
-             float(f.lats[0]), float(f.lats[0] - (h - 1) * res))
+    g = Grid(
+        w,
+        h,
+        float(f.lons[0]),
+        float(f.lons[0] + (w - 1) * res),
+        float(f.lats[0]),
+        float(f.lats[0] - (h - 1) * res),
+    )
     return np.ascontiguousarray(u), np.ascontiguousarray(v), g

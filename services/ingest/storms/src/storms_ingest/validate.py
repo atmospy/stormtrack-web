@@ -25,7 +25,11 @@ def _coords_ok(geom, errs, where):
 
 
 def _cat(v) -> bool:
-    return isinstance(v, dict) and v.get("scale") == "saffir-simpson" and v.get("label") in CATEGORY_LABELS
+    return (
+        isinstance(v, dict)
+        and v.get("scale") == "saffir-simpson"
+        and v.get("label") in CATEGORY_LABELS
+    )
 
 
 def _num_or_none(v) -> bool:
@@ -45,8 +49,19 @@ def validate_active(fc: dict) -> list:
             ids_pos.add(p["id"])
             if g["type"] != "Point":
                 errs.append(f"{w}: position must be Point")
-            for key in ("id", "name", "basin", "agency", "time", "wind_kt", "pressure_hpa", "category",
-                        "heading_deg", "speed_kmh", "wind_period_min"):
+            for key in (
+                "id",
+                "name",
+                "basin",
+                "agency",
+                "time",
+                "wind_kt",
+                "pressure_hpa",
+                "category",
+                "heading_deg",
+                "speed_kmh",
+                "wind_period_min",
+            ):
                 if key not in p:
                     errs.append(f"{w}: missing {key}")
             if p.get("agency") not in ("NHC", "JTWC"):
@@ -135,7 +150,9 @@ def validate_stats(s: dict) -> list:
             errs.append("rapid_intensification keys")
             break
     for r in s["lifetime_max"]:
-        if set(r) != {"id", "name", "year", "wind_kt", "lat", "lon"} or not (-90 <= r["lat"] <= 90 and -180 <= r["lon"] <= 180):
+        if set(r) != {"id", "name", "year", "wind_kt", "lat", "lon"} or not (
+            -90 <= r["lat"] <= 90 and -180 <= r["lon"] <= 180
+        ):
             errs.append("lifetime_max keys/range")
             break
     if len(s["notes"]) < 50:

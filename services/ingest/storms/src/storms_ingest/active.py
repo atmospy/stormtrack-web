@@ -6,9 +6,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Optional
 
-import numpy as np
 import pandas as pd
-
 import stormtrack as st
 from stormtrack.analysis import translation_speed
 
@@ -38,7 +36,10 @@ def position_feature(obs: pd.DataFrame, agency: str) -> dict:
     wind = num(last["wind"])
     return {
         "type": "Feature",
-        "geometry": {"type": "Point", "coordinates": [round(float(last["lon"]), 3), round(float(last["lat"]), 3)]},
+        "geometry": {
+            "type": "Point",
+            "coordinates": [round(float(last["lon"]), 3), round(float(last["lat"]), 3)],
+        },
         "properties": {
             "kind": "position",
             "id": str(last["storm_id"]),
@@ -62,7 +63,9 @@ def track_feature(obs: pd.DataFrame) -> Optional[dict]:
         return None
     times = [iso(t) for t in obs["time"]]
     wind = _list(obs["wind"])
-    parts, vals = split_antimeridian(list(obs["lon"]), list(obs["lat"]), {"times": times, "wind_kt": wind})
+    parts, vals = split_antimeridian(
+        list(obs["lon"]), list(obs["lat"]), {"times": times, "wind_kt": wind}
+    )
     geom = line_geometry(parts)
     return {
         "type": "Feature",
@@ -85,7 +88,9 @@ def forecast_features(storm_id: str, fc: pd.DataFrame, radii: Optional[dict]) ->
     taus = [int(t) for t in fc["tau"]]
     wind = _list(fc["vmax"])
     # one entry per vertex; crossing vertices (antimeridian) get interpolated tau/wind
-    parts, vals = split_antimeridian(list(fc["lon"]), list(fc["lat"]), {"taus": taus, "wind_kt": wind})
+    parts, vals = split_antimeridian(
+        list(fc["lon"]), list(fc["lat"]), {"taus": taus, "wind_kt": wind}
+    )
     vtaus = [None if v is None else int(round(v)) for v in vals["taus"]]
     vwind = [None if v is None else num(v, 0) for v in vals["wind_kt"]]
     feats = [
@@ -139,7 +144,9 @@ def build_active(
     Returns ``(collection, report)``; ``report`` has per-source status, the storms found
     and which forecasts were unavailable. A failing source is recorded, not raised.
     """
-    fetch_forecast_fn = fetch_forecast_fn or (lambda sid, src: st.realtime.get_forecast(sid, source=src, timeout=20))
+    fetch_forecast_fn = fetch_forecast_fn or (
+        lambda sid, src: st.realtime.get_forecast(sid, source=src, timeout=20)
+    )
     report = {"ok": [], "failed": {}, "storms": [], "forecast_unavailable": [], "forecast_ok": []}
 
     def run(src):
@@ -165,7 +172,13 @@ def build_active(
             tr = track_feature(o)
             if tr:
                 features.append(tr)
-            report["storms"].append({"id": sid, "name": None if pd.isna(o["name"].iloc[-1]) else o["name"].iloc[-1], "agency": AGENCY[src]})
+            report["storms"].append(
+                {
+                    "id": sid,
+                    "name": None if pd.isna(o["name"].iloc[-1]) else o["name"].iloc[-1],
+                    "agency": AGENCY[src],
+                }
+            )
             try:
                 fc = fetch_forecast_fn(sid, src)
                 fcf = forecast_features(sid, fc, radii if src == "nhc" else None)
@@ -176,5 +189,10 @@ def build_active(
                 report["forecast_unavailable"].append(sid)
     order = {"position": 0, "track": 1, "forecast": 2, "cone": 3}
     features.sort(key=lambda f: (f["properties"]["id"], order[f["properties"]["kind"]]))
-    fc_ = {"type": "FeatureCollection", "generated": now_iso(), "sources": [AGENCY[s] for s in report["ok"]], "features": features}
+    fc_ = {
+        "type": "FeatureCollection",
+        "generated": now_iso(),
+        "sources": [AGENCY[s] for s in report["ok"]],
+        "features": features,
+    }
     return fc_, report

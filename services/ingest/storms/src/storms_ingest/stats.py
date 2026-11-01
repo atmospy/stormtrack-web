@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pandas as pd
-
 from stormtrack import analysis as A
 
 from .common import now_iso, num
@@ -29,7 +28,11 @@ def build_stats(obs: pd.DataFrame, basin: str, agency_note: str = "") -> dict:
     ]
 
     modern = obs[obs["year"] >= MONTHLY_FROM_YEAR]
-    mc = A.monthly_climatology(modern) if len(modern) else pd.DataFrame(columns=["month", "per_year"])
+    mc = (
+        A.monthly_climatology(modern)
+        if len(modern)
+        else pd.DataFrame(columns=["month", "per_year"])
+    )
     per = {int(r.month): float(r.per_year) for r in mc.itertuples()}
     monthly = [{"month": m, "storms_per_year": round(per.get(m, 0.0), 3)} for m in range(1, 13)]
 
@@ -45,7 +48,11 @@ def build_stats(obs: pd.DataFrame, basin: str, agency_note: str = "") -> dict:
         for r in ri.itertuples()
     ]
 
-    lm = A.lifetime_max(obs).dropna(subset=["lmi_wind"]).sort_values(["lmi_wind", "year"], ascending=[False, False])
+    lm = (
+        A.lifetime_max(obs)
+        .dropna(subset=["lmi_wind"])
+        .sort_values(["lmi_wind", "year"], ascending=[False, False])
+    )
     lifetime = [
         {
             "id": r.storm_id,
