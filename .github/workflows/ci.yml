@@ -57,7 +57,7 @@ jobs:
         id: detect
         run: |
           if [ -f "${{ matrix.dir }}/pyproject.toml" ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; echo "::notice::${{ matrix.dir }} has no pyproject.toml yet; skipping"; fi
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v7
         if: steps.detect.outputs.present == 'true'
         with:
           enable-cache: true
@@ -78,13 +78,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Ruff (format + lint) on Python services
-        uses: astral-sh/ruff-action@v4
+        uses: astral-sh/ruff-action@v3
         if: hashFiles('services/**/*.py') != ''
         with:
           src: services
           args: check
       - name: Ruff format check
-        uses: astral-sh/ruff-action@v4
+        uses: astral-sh/ruff-action@v3
         if: hashFiles('services/**/*.py') != ''
         with:
           src: services

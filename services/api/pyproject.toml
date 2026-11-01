@@ -8,9 +8,9 @@ dependencies = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "stormtrack[xarray]
 [dependency-groups]
 dev = ["pytest", "httpx"]
 
-# Until stormtrack is on PyPI, develop against a local checkout; Docker uses STORMTRACK_SPEC.
+# Until stormtrack is on PyPI it comes from GitHub (branch to be switched to main once that merges).
 [tool.uv.sources]
-stormtrack = { path = "/Users/syed44/Git_Stuff/Git_Projects/imdtrack", editable = true }
+stormtrack = { git = "https://github.com/atmospy/stormtrack", branch = "fix/realtime-robustness" }
 
 [build-system]
 requires = ["hatchling"]
