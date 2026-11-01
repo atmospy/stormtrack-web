@@ -1529,6 +1529,8 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "ruff", marker = "extra == 'lint'", specifier = ">=0.5" },
+    { name = "shapely", marker = "extra == 'dev'", specifier = ">=2.0" },
+    { name = "shapely", marker = "extra == 'geo'", specifier = ">=2.0" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7" },
     { name = "sphinx-copybutton", marker = "extra == 'docs'", specifier = ">=0.5" },
     { name = "xarray", marker = "extra == 'all'", specifier = ">=2022.3" },
@@ -1536,7 +1538,7 @@ requires-dist = [
     { name = "xarray", marker = "extra == 'docs'", specifier = ">=2022.3" },
     { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2022.3" },
 ]
-provides-extras = ["all", "dev", "docs", "lint", "pipeline", "plot", "xarray"]
+provides-extras = ["all", "dev", "docs", "geo", "lint", "pipeline", "plot", "xarray"]
 
 [[package]]
 name = "stormtrack-ingest-storms"

@@ -31,7 +31,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Fork PRs get no secrets; skip them rather than fail. Production = pushes to main.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Off unless the repository variable DEPLOY_VIA_ACTIONS is 'true' (e.g. when Cloudflare's own
+    # GitHub integration builds the site instead, so there is nothing to deploy from here).
+    if: >-
+      vars.DEPLOY_VIA_ACTIONS == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
     steps:
