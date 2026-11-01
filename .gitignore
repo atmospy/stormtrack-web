@@ -1,0 +1,19 @@
+node_modules/
+.svelte-kit/
+dist/
+build/
+.wrangler/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+# generated data products are published to R2/CDN, not committed (a tiny sample is kept for dev)
+public-data/**
+!public-data/.gitkeep
+!public-data/sample/
+!public-data/sample/**
+supabase/.temp/
+supabase/.branches/
