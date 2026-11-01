@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web (check, build, test, budget)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version comes from package.json "packageManager"
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --if-present check
+      - run: pnpm -r --if-present lint
+      - run: pnpm -r --if-present test
+      - run: pnpm -r build
+        env:
+          # public values only; a placeholder lets the build run on forks without secrets
+          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321' }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder' }}
+          PUBLIC_DATA_BASE: ${{ vars.PUBLIC_DATA_BASE || '/data' }}
+      - name: Initial JS budget (<= 150 kB gzip, map lib excluded)
+        if: hashFiles('apps/web/build/index.html', 'apps/web/build/200.html') != ''
+        run: node .github/scripts/check-js-budget.mjs apps/web/build --budget-kb 150
+
+  python:
+    name: Python (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - services/ingest/wind
+          - services/ingest/storms
+          - services/ingest/hazards
+          - services/api
+    steps:
+      - uses: actions/checkout@v7
+      - name: Detect project
+        id: detect
+        run: |
+          if [ -f "${{ matrix.dir }}/pyproject.toml" ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; echo "::notice::${{ matrix.dir }} has no pyproject.toml yet; skipping"; fi
+      - uses: astral-sh/setup-uv@v10
+        if: steps.detect.outputs.present == 'true'
+        with:
+          enable-cache: true
+          cache-dependency-glob: ${{ matrix.dir }}/uv.lock
+      - name: Sync dependencies
+        if: steps.detect.outputs.present == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: uv sync
+      - name: pytest
+        if: steps.detect.outputs.present == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: uv run pytest -q
+
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Ruff (format + lint) on Python services
+        uses: astral-sh/ruff-action@v4
+        if: hashFiles('services/**/*.py') != ''
+        with:
+          src: services
+          args: check
+      - name: Ruff format check
+        uses: astral-sh/ruff-action@v4
+        if: hashFiles('services/**/*.py') != ''
+        with:
+          src: services
+          args: format --check
+      - name: Workflow lint (actionlint)
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
+      - name: Budget script syntax
+        run: node --check .github/scripts/check-js-budget.mjs
+
+  supabase:
+    name: Supabase migrations and RLS tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
+        with:
+          version: latest
+      - name: Start local stack (skip services the SQL tests do not need)
+        run: |
+          cp supabase/.env.example supabase/.env
+          supabase start -x realtime,storage-api,imgproxy,mailpit,studio,edge-runtime,logflare,vector,supavisor
+      - name: Reset DB (migrations + seed)
+        run: supabase db reset
+      - name: pgTAP tests
+        run: supabase test db
+      - name: Types are up to date (advisory, CLI output may vary)
+        continue-on-error: true
+        run: |
+          supabase gen types typescript --local --schema public > /tmp/types.ts
+          diff -u supabase/types.ts /tmp/types.ts

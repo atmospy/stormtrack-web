@@ -1,0 +1,15 @@
+{
+  "$comment": "Cache-Control (and Content-Type) the ingest jobs MUST set on every R2 object they upload. First matching rule wins; match is a glob on the object key. Run-stamped wind frames are immutable (a new run gets a new key); everything pointer-like is short-lived with stale-while-revalidate so a slow origin or failed ingest never blanks the app. Cloudflare's R2 custom-domain CDN honours these headers.",
+  "rules": [
+    { "match": "wind/*/f*.png",            "cache_control": "public, max-age=31536000, immutable",                              "content_type": "image/png" },
+    { "match": "wind/latest.json",         "cache_control": "public, max-age=60, stale-while-revalidate=300, stale-if-error=86400",  "content_type": "application/json" },
+    { "match": "storms/active.geojson",    "cache_control": "public, max-age=60, stale-while-revalidate=300, stale-if-error=86400",  "content_type": "application/geo+json" },
+    { "match": "storms/index.json",        "cache_control": "public, max-age=60, stale-while-revalidate=300, stale-if-error=86400",  "content_type": "application/json" },
+    { "match": "hazards/index.json",       "cache_control": "public, max-age=60, stale-while-revalidate=300, stale-if-error=86400",  "content_type": "application/json" },
+    { "match": "hazards/*.geojson",        "cache_control": "public, max-age=120, stale-while-revalidate=600, stale-if-error=86400", "content_type": "application/geo+json" },
+    { "match": "storms/history/*.geojson", "cache_control": "public, max-age=3600, stale-while-revalidate=86400",               "content_type": "application/geo+json" },
+    { "match": "storms/stats/*.json",      "cache_control": "public, max-age=3600, stale-while-revalidate=86400",               "content_type": "application/json" },
+    { "match": "*",                        "cache_control": "public, max-age=300",                                              "content_type": null }
+  ],
+  "upload_order": "Upload all payload files first, the pointer (latest.json / index.json) LAST, so clients never follow a pointer to a missing object."
+}

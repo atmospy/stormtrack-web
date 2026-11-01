@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://stormtrack-web.pages.dev",
+          "https://*.stormtrack-web.pages.dev",
+          "https://stormtrack.example",
+          "http://localhost:5173",
+          "http://localhost:4173"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": ["Range", "If-None-Match", "If-Modified-Since"]
+      },
+      "exposeHeaders": ["ETag", "Content-Length", "Content-Range", "Last-Modified"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

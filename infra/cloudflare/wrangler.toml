@@ -1,0 +1,9 @@
+# Cloudflare Pages project config for the static web app (apps/web -> adapter-static -> build/).
+# Used by `wrangler pages ...`; CI deploys with an explicit directory so this is mainly the
+# source of truth for the project name / output dir / compatibility date.
+# Run from the repo root:  npx wrangler pages deploy --config infra/cloudflare/wrangler.toml
+# NOTE: secrets never go here. PUBLIC_* build vars are set as GitHub repo variables (build
+# happens in GitHub Actions, not on Cloudflare), so no [vars] are needed either.
+name = "stormtrack-web"
+compatibility_date = "2026-10-01"
+pages_build_output_dir = "../../apps/web/build"

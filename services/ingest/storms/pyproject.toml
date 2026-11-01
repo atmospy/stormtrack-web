@@ -1,0 +1,26 @@
+[project]
+name = "stormtrack-ingest-storms"
+version = "0.1.0"
+description = "Storm ingest job for StormTrack Web (CONTRACTS section 2)"
+requires-python = ">=3.10"
+dependencies = ["stormtrack[xarray]", "shapely>=2", "numpy", "pandas", "pyarrow", "boto3"]
+
+[project.scripts]
+ingest-storms = "storms_ingest.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "moto[s3]"]
+
+[tool.uv.sources]
+stormtrack = { path = "/Users/syed44/Git_Stuff/Git_Projects/imdtrack", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/storms_ingest"]
+
+[tool.pytest.ini_options]
+markers = ["network: live network test (deselect with -m 'not network')"]
+addopts = "-m 'not network'"

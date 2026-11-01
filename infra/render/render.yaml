@@ -1,0 +1,30 @@
+# Render Blueprint for the FastAPI analysis service (services/api).
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo -> set the blueprint path to
+# infra/render/render.yaml. Secrets (sync: false) are entered in the dashboard, never here.
+services:
+  - type: web
+    name: stormtrack-api
+    runtime: docker
+    plan: free # free instances sleep after 15 min idle (cold start ~30-60 s); upgrade when needed
+    region: frankfurt # change to the region nearest your users
+    rootDir: . # Docker context = repo root so the image can read the workspace if it needs to
+    dockerfilePath: services/api/Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - services/api/**
+        - infra/render/render.yaml
+    envVars:
+      - key: CORS_ORIGINS # comma-separated exact origins allowed to call the API
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET # or JWKS URL; used only to verify user JWTs on protected routes
+        sync: false
+      - key: DATA_BASE_URL # public R2/CDN base the API reads precomputed data from
+        sync: false
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: LOG_LEVEL
+        value: info

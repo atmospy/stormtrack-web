@@ -74,6 +74,14 @@ Basins use IBTrACS codes (`NI`, `WP`, `EP`, `NA`, `SI`, `SP`, `SA`); M0 requires
   `stormtrack.verification`); props `id`, `radii_km`, `basis` (text saying where radii came from).
 Wind averaging: NHC/JTWC are 1-minute; always add `"wind_period_min": 1` to `position`.
 
+**Clarifications (decided after M0, binding for producers and consumers):**
+- Every `forecast` feature carries the storm `id` (as `position`, `track` and `cone` do); consumers must key on `id`, not geometry.
+- `cone.properties.radii_km` is a list aligned index-for-index with a `taus` list (hours) on the same feature.
+- Geometries that cross the antimeridian are emitted as `MultiLineString` / `MultiPolygon` (split at ±180, coordinates stay in `-180..180`); a `LineString` / `Polygon` is the single-part case. Consumers must accept both.
+- Producers may add extra properties; consumers must ignore unknown ones. Required properties above may not be removed or renamed without bumping `schema`.
+- `annual[].tropical_storm|hurricane|major` in stats are plain wind thresholds (34 / 64 / 96 kt of lifetime maximum), **not** IMD grades.
+- Forecast/cone are omitted (and the id listed in `index.active.forecast_unavailable`) when an agency forecast cannot be fetched; the UI must treat them as optional.
+
 `history/<basin>.geojson`: LineString per storm; props `id`, `name` (nullable), `year`,
 `max_wind_kt` (nullable), `category` (Saffir–Simpson label of the peak, nullable), `imd_grade`
 (nullable, e.g. `"SCS"`), `start`, `end`. Coordinates rounded to 2 decimals. Target ≤ 1.5 MB gzip.

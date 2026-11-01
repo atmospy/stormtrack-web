@@ -1,0 +1,29 @@
+# Cloudflare Pages headers for the static app.
+# Workstream A: copy this file to apps/web/static/_headers (CI also copies it into the build
+# output if it is missing). Edit the two origins marked EDIT before going live.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  # Report-Only first so a missed origin cannot blank the map. After checking the browser
+  # console on a preview deploy, rename to Content-Security-Policy to enforce.
+  # EDIT: data origin (R2 custom domain) and API origin (Render).
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https://tiles.openfreemap.org; connect-src 'self' https://data.stormtrack.example https://*.r2.dev https://*.supabase.co wss://*.supabase.co https://tiles.openfreemap.org https://api.stormtrack.example; worker-src 'self' blob:; child-src blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+
+# SvelteKit fingerprinted assets: cache forever.
+/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML and the version manifest must revalidate so deploys take effect immediately.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/_app/version.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Dev-only sample data should never be served by production; real data lives on the R2 domain.
+/data/*
+  Cache-Control: public, max-age=60, stale-while-revalidate=300

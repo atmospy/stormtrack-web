@@ -1,0 +1,1 @@
+{"schema":1,"generated":"2026-11-01T05:00:00Z","layers":{"events":{"count":12,"source":"NASA EONET (sample)"},"quakes":{"count":70,"source":"USGS (sample)"},"fires":{"count":400,"source":"NASA FIRMS (sample)"}}}
