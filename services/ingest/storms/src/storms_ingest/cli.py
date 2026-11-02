@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 from . import __version__, basins
@@ -183,7 +184,28 @@ def write_all_index(out: Path, block: dict, written: list) -> dict:
 _ALL_KEYS = ("name", "count", "year_min", "year_max", "file", "stats", "bytes", "gzip_bytes")
 
 
-def run_active(out: Path, args, written: list):
+HOLD_EMPTY_FOR_S = (
+    3 * 3600
+)  # an empty answer right after a non-empty one is distrusted for this long
+RETRY_EMPTY_AFTER_S = 45
+
+
+def suspicious_empty(report: dict, prev_active, now: float) -> bool:
+    """True when a run found no storms although the previous published run found some a short while ago.
+
+    The agencies' mirrors occasionally answer with an empty listing and no error; replacing a good file with
+    an empty one made every active storm vanish from the site. A storm that really ended is accepted once the
+    previous run is older than HOLD_EMPTY_FOR_S."""
+    if report["storms"] or not prev_active or not prev_active.get("count"):
+        return False
+    try:
+        t = datetime.fromisoformat(str(prev_active["updated"]).replace("Z", "+00:00")).timestamp()
+    except (KeyError, ValueError):
+        return False
+    return 0 <= now - t < HOLD_EMPTY_FOR_S
+
+
+def run_active(out: Path, args, written: list, prev_active=None, sleep=time.sleep):
     from .active import build_active
     from .cone import build_radii
     from .validate import validate_active
@@ -199,6 +221,21 @@ def run_active(out: Path, args, written: list):
     coll, report = build_active(radii)
     if not report["ok"]:
         raise RuntimeError(f"all active sources failed: {report['failed']}")
+    if suspicious_empty(report, prev_active, time.time()):
+        log.warning(
+            "no storms found but the last run had %s; retrying in %ds",
+            prev_active.get("count"),
+            RETRY_EMPTY_AFTER_S,
+        )
+        sleep(RETRY_EMPTY_AFTER_S)
+        coll, report = build_active(radii)
+        if not report["ok"]:
+            raise RuntimeError(f"all active sources failed: {report['failed']}")
+        if suspicious_empty(report, prev_active, time.time()):
+            raise RuntimeError(
+                f"no storms found twice although the last run (at {prev_active.get('updated')}) had "
+                f"{prev_active.get('count')}; keeping the previous file"
+            )
     errs = validate_active(coll)
     if errs:
         raise RuntimeError(f"active failed validation: {errs[:5]}")
@@ -239,7 +276,7 @@ def main(argv=None) -> int:
     if args.only in ("all", "active"):
         attempted += 1
         try:
-            rep = run_active(out, args, written)
+            rep = run_active(out, args, written, prev.get("active"))
             active_block = {
                 "count": len(rep["storms"]),
                 "updated": now_iso(),
