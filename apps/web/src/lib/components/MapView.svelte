@@ -21,6 +21,7 @@
   import { groupStorms } from '#lib/data/active';
   import { darkStyle } from '#lib/map/style';
   import { ACTIVE_HIT_LAYERS, HISTORY_LAYER, addStormLayers, setActiveData, setHighlight, setStormVisibility, startPulse } from '#lib/map/storms';
+  import { setSatellite } from '#lib/map/satellite';
   import { NOWCAST_HIT_LAYERS, addNowcastLayers, nowcastPopup, setNowcastData, setNowcastVisibility } from '#lib/map/nowcast';
   import { HAZARD_HIT_LAYERS, addHazardLayers, popupContent, setHazardData, setHazardVisibility } from '#lib/map/hazards';
   import { addArrowLayer, updateArrows } from '#lib/map/arrows';
@@ -272,6 +273,9 @@
       const d = app.hazards[k];
       if (d) setHazardData(map, k, d);
     }
+  });
+  $effect(() => {
+    if (ready && map) setSatellite(map, app.layers.satellite && app.availability.satellite === 'ready', app.satellite);
   });
   $effect(() => {
     if (ready && map && app.nowcast) setNowcastData(map, app.nowcast);

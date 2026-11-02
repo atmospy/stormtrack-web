@@ -12,7 +12,9 @@ import {
   type HazardIndex,
   type HistoryCollection,
   type NowcastFile,
-  parseNowcast
+  type SatelliteMeta,
+  parseNowcast,
+  parseSatellite
 } from './contracts';
 import { parseHistoryIndex, type HistoryIndex } from './history';
 import { parseCoverage, parseFlashes, parseLightningIndex, type Flashes, type LightningIndex } from './lightning';
@@ -212,3 +214,6 @@ export const loadHazardLayer = (name: 'events' | 'quakes' | 'fires', base: strin
 
 /** Nowcast has no bundled sample: a missing file just means the layer is unavailable. */
 export const loadNowcast = (signal?: AbortSignal) => resolve<NowcastFile>('nowcast/latest.geojson', parseNowcast, signal, [DATA_BASE]);
+
+/** The INSAT image metadata; no bundled sample either. */
+export const loadSatellite = (signal?: AbortSignal) => resolve<SatelliteMeta>('satellite/insat-ir.json', parseSatellite, signal, [DATA_BASE]);

@@ -10,7 +10,7 @@
 
   let open = $state(typeof matchMedia === 'undefined' || !matchMedia('(max-width: 720px)').matches);
 
-  type Row = { key: LayerKey; label: string; icon: 'wind' | 'storm' | 'history' | 'fire' | 'quake' | 'event' | 'bolt'; hint: string; key_: string };
+  type Row = { key: LayerKey; label: string; icon: 'wind' | 'storm' | 'history' | 'fire' | 'quake' | 'event' | 'bolt' | 'cloud'; hint: string; key_: string };
   const rows: Row[] = [
     { key: 'wind', label: 'Weather', icon: 'wind', hint: 'wind, pressure, temperature, rain', key_: 'W' },
     { key: 'storms', label: 'Active cyclones', icon: 'storm', hint: '', key_: 'S' },
@@ -18,6 +18,7 @@
     { key: 'events', label: 'Natural events', icon: 'event', hint: 'NASA EONET', key_: 'E' },
     { key: 'quakes', label: 'Earthquakes', icon: 'quake', hint: 'USGS 24 h', key_: 'Q' },
     { key: 'fires', label: 'Fire hotspots', icon: 'fire', hint: 'NASA FIRMS', key_: 'F' },
+    { key: 'satellite', label: 'Satellite', icon: 'cloud', hint: 'INSAT infrared, IMD', key_: 'I' },
     { key: 'nowcast', label: 'India warnings', icon: 'event', hint: 'IMD district nowcast, ~3 h', key_: 'N' },
     { key: 'lightning', label: 'Lightning', icon: 'bolt', hint: 'GOES GLM · Americas', key_: 'G' }
   ];

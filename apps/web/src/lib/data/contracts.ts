@@ -438,3 +438,37 @@ export function parseNowcast(raw: unknown): NowcastFile {
     counts: { light: n(c.light), moderate: n(c.moderate), severe: n(c.severe) }
   };
 }
+
+
+/** INSAT infrared image metadata (`satellite/insat-ir.json`). */
+export interface SatelliteMeta {
+  image: string;
+  /** west, south, east, north in degrees */
+  bounds: [number, number, number, number];
+  changedAt: string;
+  generated: string;
+  sha8: string;
+  attribution: string;
+  note: string;
+}
+
+export function parseSatellite(raw: unknown): SatelliteMeta {
+  const C = 'satellite/insat-ir.json';
+  const o = obj(C, '$', raw);
+  const image = typeof o.image === 'string' && /^[A-Za-z0-9._-]{1,64}\.jpg$/.test(o.image) ? o.image : null;
+  if (!image) throw new ContractError(C, 'image', 'expected a plain .jpg file name');
+  const b = arr(C, 'bounds', o.bounds);
+  const [w, s, e, n] = b as unknown[];
+  if (![w, s, e, n].every((v) => typeof v === 'number' && Number.isFinite(v))) throw new ContractError(C, 'bounds', 'expected four numbers');
+  const [W, S, E, N] = [w, s, e, n] as number[];
+  if (!(W! < E! && S! < N! && W! >= -180 && E! <= 180 && S! >= -90 && N! <= 90)) throw new ContractError(C, 'bounds', 'not a valid west/south/east/north box');
+  return {
+    image,
+    bounds: [W!, S!, E!, N!],
+    changedAt: typeof o.changed_at === 'string' ? o.changed_at : '',
+    generated: typeof o.generated === 'string' ? o.generated : '',
+    sha8: typeof o.sha256 === 'string' ? o.sha256.replace(/[^0-9a-f]/gi, '').slice(0, 8) : '',
+    attribution: typeof o.attribution === 'string' ? o.attribution : 'India Meteorological Department (IMD)',
+    note: typeof o.note === 'string' ? o.note : ''
+  };
+}

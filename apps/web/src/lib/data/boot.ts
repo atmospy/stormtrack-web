@@ -4,7 +4,7 @@ import { history } from '#lib/history/state.svelte';
 import { applyRestoredHistory } from '#lib/state/share.svelte';
 import { weather } from '#lib/weather/runtime.svelte';
 import { nearestIndex } from '#lib/weather/select';
-import { loadActive, loadCatalogue, loadHazardIndex, loadHazardLayer, loadHistoryIndex, loadNowcast, loadStats, loadStormsIndex } from './load';
+import { loadActive, loadCatalogue, loadHazardIndex, loadHazardLayer, loadHistoryIndex, loadNowcast, loadSatellite, loadStats, loadStormsIndex } from './load';
 
 type HazardName = 'events' | 'quakes' | 'fires';
 let hazardBase = '';
@@ -12,7 +12,7 @@ let stormsBase: string = DATA_BASE;
 
 /** Kick off every data request in parallel; each failure only disables its own layer. */
 export function bootData(signal?: AbortSignal): Promise<void> {
-  return Promise.all([bootWeather(signal), bootStorms(signal), bootHazards(signal), bootNowcast(signal)]).then(() => undefined);
+  return Promise.all([bootWeather(signal), bootStorms(signal), bootHazards(signal), bootNowcast(signal), bootSatellite(signal)]).then(() => undefined);
 }
 
 async function bootWeather(signal?: AbortSignal): Promise<void> {
@@ -107,6 +107,19 @@ export function ensureStats(basin: string): Promise<void> {
     statsPromises.set(basin, p);
   }
   return p;
+}
+
+async function bootSatellite(signal?: AbortSignal): Promise<void> {
+  const r = await loadSatellite(signal);
+  if (!r.ok) {
+    app.availability.satellite = r.missing ? 'missing' : 'error';
+    app.notes.satellite = r.missing ? 'Not published yet' : r.error;
+    app.layers.satellite = false;
+    return;
+  }
+  const m = r.value.data;
+  app.satellite = { ...m, url: `${r.value.base}/satellite/${m.image}${m.sha8 ? `?v=${m.sha8}` : ''}` };
+  app.availability.satellite = 'ready';
 }
 
 async function bootNowcast(signal?: AbortSignal): Promise<void> {
