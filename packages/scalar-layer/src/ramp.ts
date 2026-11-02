@@ -5,25 +5,29 @@ import type { ScalarRamp } from './types.js';
  * Rationale is in the README ("Colour ramps"). All were chosen to read on a near-black basemap.
  */
 export const SCALAR_RAMPS: Record<'temperature' | 'pressure' | 'precipitation' | 'viridis', ScalarRamp> = {
-  // Diverging blue <-> orange around the freezing point. Blue/orange survives protan/deutan/tritan-lite CVD
-  // (no red-green axis); lightness peaks at 0 degC and falls toward both extremes, so sign is carried by hue
-  // and magnitude by lightness + chroma.
+  // Windy-style "weather" scale over the range people actually see (-30..45 degC; values outside clamp to the end
+  // colours): violet -> blue -> cyan -> green -> yellow -> orange -> red -> crimson. Roughly one distinct hue
+  // step per 5 degC so a 3 degC difference is visible, including between 25 and 35 degC where most of the tropics sit.
   temperature: {
     name: 'temperature',
     unit: '°C',
     stops: [
-      [-40, '#6b3fb8'],
-      [-30, '#4a4fcb'],
-      [-20, '#2f6fe0'],
-      [-10, '#4ea2f0'],
-      [-3, '#a6d3f6'],
-      [0, '#e9eef2'],
-      [3, '#f7e2bd'],
-      [10, '#f7c26b'],
-      [20, '#f29a3d'],
-      [30, '#e5602d'],
-      [40, '#c42a2a'],
-      [50, '#8f0f3a'],
+      [-30, '#8a4fd8'],
+      [-20, '#5a52e6'],
+      [-10, '#2f7cf2'],
+      [-5, '#2da4f0'],
+      [0, '#27c6e6'],
+      [5, '#25d4b4'],
+      [10, '#4fdc7a'],
+      [15, '#9ce63f'],
+      [20, '#e8e83a'],
+      [25, '#f9c52f'],
+      [28, '#f9a02b'],
+      [31, '#f67a28'],
+      [34, '#ee542a'],
+      [37, '#e03030'],
+      [40, '#c4203e'],
+      [45, '#8c1664'],
     ],
   },
   // Deliberately low-contrast slate: blue-grey lows, neutral 1013, warm-grey highs, mostly translucent so
@@ -41,22 +45,25 @@ export const SCALAR_RAMPS: Record<'temperature' | 'pressure' | 'precipitation' |
       [1060, '#ab9078'],
     ],
   },
-  // Sequential, lightness rising with amount; fully transparent below 0.1 mm so dry areas show the basemap.
+  // Radar-style rain: pale blue drizzle -> blue -> green -> yellow -> orange -> red -> magenta. Dry areas are fully
+  // transparent; light rain is already clearly visible (opaque enough), heavy rain is solid.
   precipitation: {
     name: 'precipitation',
     unit: 'mm',
     stops: [
-      [0, '#2c5aa000'],
-      [0.1, '#2c5aa000'],
-      [0.2, '#2c5aa088'],
-      [1, '#3c7fd0b0'],
-      [2.5, '#4fb0e6d0'],
-      [5, '#7fe0e0e6'],
-      [10, '#f4f08a'],
-      [20, '#f6a84a'],
-      [40, '#ec5a6e'],
-      [70, '#c43cc4'],
-      [100, '#f2d5ff'],
+      [0, '#6cc8ff00'],
+      [0.25, '#6cc8ff00'],
+      [0.5, '#7fd0ff66'],
+      [1, '#4aa8ffcc'],
+      [1.5, '#2f80f0dd'],
+      [2, '#26c46ae6'],
+      [4, '#7bdc3cea'],
+      [7, '#f2e83aee'],
+      [12, '#f5a52cf0'],
+      [20, '#ee4a2af2'],
+      [35, '#c01a5cf4'],
+      [60, '#a020c8f6'],
+      [100, '#f0c8ffff'],
     ],
   },
   // matplotlib viridis (perceptually uniform, CVD-safe); positions are fractions of the range.

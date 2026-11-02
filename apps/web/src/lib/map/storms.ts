@@ -1,6 +1,7 @@
 import type { GeoJSONSource, Map as MlMap, ExpressionSpecification } from 'maplibre-gl';
 import type { ActiveStorms, HistoryCollection } from '#lib/data/contracts';
 import { nearestStormId } from '#lib/data/active';
+import { positionAt } from '#lib/map/stormTime';
 import { categoryFromLabel, categoryFromWind, colorFor, CATEGORIES } from '#lib/util/storm';
 
 /** Layers a click can resolve to an active storm. */
@@ -26,8 +27,8 @@ export function addStormLayers(map: Map_): void {
   map.addLayer({ id: 'st-history-glow', type: 'line', source: 'st-history', filter: noSel, layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': '#ffffff', 'line-opacity': 0.2, 'line-width': 9, 'line-blur': 6 } });
   map.addLayer({ id: 'st-history-hl', type: 'line', source: 'st-history', filter: noSel, layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': colorExpr, 'line-opacity': 1, 'line-width': 3 } });
 
-  map.addLayer({ id: 'st-cone-fill', type: 'fill', source: 'st-lines', filter: only('cone'), paint: { 'fill-color': '#9fd8ff', 'fill-opacity': 0.13 } });
-  map.addLayer({ id: 'st-cone-line', type: 'line', source: 'st-lines', filter: only('cone'), paint: { 'line-color': '#9fd8ff', 'line-opacity': 0.55, 'line-width': 1 } });
+  map.addLayer({ id: 'st-cone-fill', type: 'fill', source: 'st-lines', filter: only('cone'), paint: { 'fill-color': '#9fd8ff', 'fill-opacity': 0.24 } });
+  map.addLayer({ id: 'st-cone-line', type: 'line', source: 'st-lines', filter: only('cone'), paint: { 'line-color': '#c8e9ff', 'line-opacity': 0.9, 'line-width': 1.5 } });
   map.addLayer({ id: 'st-track', type: 'line', source: 'st-lines', filter: only('track'), layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#e8f3ff', 'line-opacity': 0.85, 'line-width': 2 } });
   map.addLayer({ id: 'st-track-pts', type: 'circle', source: 'st-pts', filter: only('trackpt'), paint: { 'circle-color': colorExpr, 'circle-radius': 3, 'circle-stroke-color': '#050914', 'circle-stroke-width': 1 } });
   map.addLayer({ id: 'st-forecast', type: 'line', source: 'st-lines', filter: only('forecast'), layout: { 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-opacity': 0.9, 'line-width': 2, 'line-dasharray': [1.6, 1.6] } });
@@ -48,7 +49,8 @@ export function addStormLayers(map: Map_): void {
 }
 type Map_ = MlMap;
 
-export function setActiveData(map: Map_, active: ActiveStorms): void {
+/** `validMs`: the time slider's time; storms with a forecast are drawn where the forecast puts them then. */
+export function setActiveData(map: Map_, active: ActiveStorms, validMs: number | null = null): void {
   const lines: GeoJSON.Feature[] = [];
   const pts: GeoJSON.Feature[] = [];
   const names = new Map<string, string>();
@@ -58,8 +60,11 @@ export function setActiveData(map: Map_, active: ActiveStorms): void {
   for (const f of active.features) {
     const p = f.properties;
     if (p.kind === 'position') {
-      const cat = categoryFromLabel(p.category.label, p.wind_kt);
-      pts.push({ type: 'Feature', geometry: f.geometry as GeoJSON.Point, properties: { kind: 'position', id: p.id, label: p.name ?? p.id, color: cat.color, cat: cat.label, wind: p.wind_kt } });
+      const tp = validMs === null ? null : positionAt(active, p.id, validMs);
+      const wind = tp?.forecast && tp.wind !== null ? tp.wind : p.wind_kt;
+      const cat = tp?.forecast ? categoryFromWind(wind) : categoryFromLabel(p.category.label, p.wind_kt);
+      const geometry: GeoJSON.Point = tp ? { type: 'Point', coordinates: [tp.lon, tp.lat] } : (f.geometry as GeoJSON.Point);
+      pts.push({ type: 'Feature', geometry, properties: { kind: 'position', id: p.id, label: p.name ?? p.id, color: cat.color, cat: cat.label, wind, projected: tp?.forecast ?? false } });
     } else if (p.kind === 'track') {
       lines.push({ type: 'Feature', geometry: f.geometry as GeoJSON.LineString, properties: { kind: 'track', id: p.id } });
       (f.geometry as GeoJSON.LineString).coordinates.forEach((c, i) => {

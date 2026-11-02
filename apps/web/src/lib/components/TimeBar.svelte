@@ -38,7 +38,7 @@
 {/if}
 
 <style>
-  .bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--gap) + var(--safe-b)); width: min(640px, calc(100vw - 2 * var(--gap))); display: flex; align-items: center; gap: 14px; padding: 10px 16px 8px 10px; z-index: 4; }
+  .bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--dock-bottom) + var(--safe-b)); width: min(640px, calc(100vw - 2 * var(--gap))); display: flex; align-items: center; gap: 14px; padding: 10px 16px 8px 10px; z-index: 4; }
   .ctrl { display: flex; gap: 2px; align-items: center; }
   .play { background: linear-gradient(135deg, #1ec8f0, #6b6bff); border-color: transparent; color: #04101c; width: 40px; height: 40px; border-radius: 50%; }
   .play:hover { filter: brightness(1.12); box-shadow: var(--glow); }

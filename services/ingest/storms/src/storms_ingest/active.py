@@ -12,10 +12,40 @@ from stormtrack.analysis import translation_speed
 
 from .common import cat_obj, category, iso, line_geometry, now_iso, num, split_antimeridian
 from .cone import cone_geometry
+from .jtwc_text import fetch_forecast as fetch_jtwc_text
 
 log = logging.getLogger(__name__)
 
 AGENCY = {"nhc": "NHC", "jtwc": "JTWC"}
+
+# JTWC publishes no cone. When we draw one for a JTWC storm it uses NHC-derived radii and must say so.
+PROXY_NOTE = (
+    "PROXY, not a JTWC product: JTWC publishes no cone of uncertainty. Radii are our estimate from NHC "
+    "(Atlantic/East Pacific) track errors, so they likely understate the western North Pacific / Indian "
+    "Ocean error; treat as indicative only. "
+)
+
+
+def _http_text(url: str, timeout: float = 20.0) -> str:
+    import urllib.request
+
+    req = urllib.request.Request(url, headers={"User-Agent": "stormtrack-web-ingest"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - fixed https host
+        return r.read().decode("latin-1")
+
+
+def _get_forecast(sid: str, src: str, timeout: float = 20.0) -> pd.DataFrame:
+    """Agency forecast: JTWC from its warning text first, then the library (ATCF mirrors)."""
+    if src == "jtwc":
+        try:
+            return fetch_jtwc_text(sid, lambda u: _http_text(u, timeout))
+        except Exception as exc:  # noqa: BLE001
+            log.info(
+                "JTWC warning text unavailable for %s (%s); trying ATCF mirrors",
+                sid,
+                str(exc)[:120],
+            )
+    return st.realtime.get_forecast(sid, source=src, timeout=timeout)
 
 
 def contract_basin(basin: str, lon: float) -> str:
@@ -79,7 +109,9 @@ def track_feature(obs: pd.DataFrame) -> Optional[dict]:
     }
 
 
-def forecast_features(storm_id: str, fc: pd.DataFrame, radii: Optional[dict]) -> list:
+def forecast_features(
+    storm_id: str, fc: pd.DataFrame, radii: Optional[dict], proxy: bool = False
+) -> list:
     """Forecast LineString (+ cone when radii are available) for one storm."""
     fc = fc.sort_values(["init", "tau"])
     fc = fc[fc["init"] == fc["init"].max()].drop_duplicates("tau").sort_values("tau")
@@ -121,7 +153,8 @@ def forecast_features(storm_id: str, fc: pd.DataFrame, radii: Optional[dict]) ->
                         "id": storm_id,
                         "taus": used,
                         "radii_km": [round(radii["radii_km"][t], 1) for t in used],
-                        "basis": radii["basis"],
+                        "basis": (PROXY_NOTE if proxy else "") + radii["basis"],
+                        **({"proxy": True} if proxy else {}),
                     },
                 }
             )
@@ -144,9 +177,7 @@ def build_active(
     Returns ``(collection, report)``; ``report`` has per-source status, the storms found
     and which forecasts were unavailable. A failing source is recorded, not raised.
     """
-    fetch_forecast_fn = fetch_forecast_fn or (
-        lambda sid, src: st.realtime.get_forecast(sid, source=src, timeout=20)
-    )
+    fetch_forecast_fn = fetch_forecast_fn or _get_forecast
     report = {"ok": [], "failed": {}, "storms": [], "forecast_unavailable": [], "forecast_ok": []}
 
     def run(src):
@@ -181,7 +212,7 @@ def build_active(
             )
             try:
                 fc = fetch_forecast_fn(sid, src)
-                fcf = forecast_features(sid, fc, radii if src == "nhc" else None)
+                fcf = forecast_features(sid, fc, radii, proxy=(src == "jtwc"))
                 features += fcf
                 report["forecast_ok" if fcf else "forecast_unavailable"].append(sid)
             except Exception as exc2:  # noqa: BLE001 - JTWC forecast mirrors are often blocked

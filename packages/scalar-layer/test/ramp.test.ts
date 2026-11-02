@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { SCALAR_RAMPS, buildRampLUT, rampColorAt } from '../src/index.js';
 
 describe('ramps', () => {
-  it('temperature is diverging around 0 degC: blue cold, near-white freezing, orange/red warm', () => {
+  it('temperature runs violet/blue (cold) -> cyan (freezing) -> yellow/orange/red (hot)', () => {
     const r = SCALAR_RAMPS.temperature;
     const cold = rampColorAt(r, [-40, 50], -25);
     const zero = rampColorAt(r, [-40, 50], 0);
     const hot = rampColorAt(r, [-40, 50], 35);
     expect(cold[2]).toBeGreaterThan(cold[0]); // blue-dominant
     expect(hot[0]).toBeGreaterThan(hot[2]); // red-dominant
-    expect(Math.min(zero[0], zero[1], zero[2])).toBeGreaterThan(200); // light neutral
+    expect(zero[1]).toBeGreaterThan(zero[0]); // freezing line reads cyan/teal (green+blue > red)
+    expect(zero[2]).toBeGreaterThan(zero[0]);
     expect(zero[3]).toBe(255);
   });
 
