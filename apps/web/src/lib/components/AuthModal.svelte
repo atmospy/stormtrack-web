@@ -66,7 +66,7 @@
       </form>
       {#if err}<p class="err" role="alert">{err}</p>{/if}
     {/if}
-    <p class="fine">By continuing you agree this is an early preview. The account only stores what you choose to save.</p>
+    <p class="fine">By continuing you agree to the <a href="/terms" target="_blank" rel="noopener">terms</a> and the <a href="/privacy" target="_blank" rel="noopener">privacy policy</a>. This is an early preview. The account stores your email and what you choose to save.</p>
   </div>
 </div>
 
@@ -90,4 +90,5 @@
   .ok { background: rgba(61, 224, 176, 0.1); border: 1px solid rgba(61, 224, 176, 0.35); padding: 12px; border-radius: 10px; }
   .err { color: var(--danger); font-size: 13px; margin: 10px 0 0; }
   .fine { font-size: 11px; color: var(--text-faint); margin: 16px 0 0; }
+  .fine a { color: var(--text-dim); }
 </style>
