@@ -15,8 +15,13 @@ name: Ingest (scheduled)
 #  * storms history/stats (all basins): changes once a season; weekly (Mondays), with the IBTrACS
 #    download cache persisted, and on demand. The 30-min storms job only does the ACTIVE storms.
 #  * lightning: GOES GLM publishes a file every 20 s; GitHub cron is best-effort (>= 5 min, can lag),
-#    so we run every 10 min (the job is incremental) = "a few minutes behind", not real time. A
-#    private repo pays for these minutes; keep INGEST_ENABLED=false until R2 is set up.
+#    so we run every 10 min (the job is incremental) = "a few minutes behind", not real time. The
+#    repo is public, so standard runners are free; if it ever goes private these minutes are billed
+#    (about 400 a day), so set INGEST_ENABLED=false first.
+#  * wind models: each takes ~7 min (GFS, ECMWF IFS, ECMWF AIFS), so the job is ~22 min. One model
+#    failing does not stop the others being published; only the job turns red.
+#  * GitHub disables scheduled workflows in a public repo after 60 days without repository activity;
+#    re-enable them in the Actions tab if that happens.
 #  * hazards: USGS quakes update every minute, EONET several times an hour; every 20 min.
 #  Minutes are offset from :00 to dodge the top-of-hour scheduling pile-up.
 
@@ -35,9 +40,9 @@ on:
         default: all
         options: [all, wind, storms, hazards, lightning, history]
       models:
-        description: "Wind models for a manual run: comma list of gfs, ecmwf-ifs, ecmwf-aifs (scheduled runs use gfs)"
+        description: "Wind models: comma list of gfs, ecmwf-ifs, ecmwf-aifs (scheduled runs use all three)"
         type: string
-        default: gfs
+        default: gfs,ecmwf-ifs,ecmwf-aifs
 
 permissions:
   contents: read
@@ -74,7 +79,7 @@ jobs:
         if: steps.detect.outputs.present == 'true'
         working-directory: services/ingest/wind
         env:
-          MODELS: ${{ inputs.models || 'gfs' }} # passed through env, not interpolated into the script
+          MODELS: ${{ inputs.models || 'gfs,ecmwf-ifs,ecmwf-aifs' }} # passed through env, not interpolated into the script
         run: |
           uv sync
           uv run ingest-wind --models "$MODELS" --out "$RUNNER_TEMP/wind" --upload
