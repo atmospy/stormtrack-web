@@ -25,13 +25,20 @@ def main(argv=None, *, clock=time.monotonic, sleep=None, stop=None) -> int:
         "--source",
         action="append",
         help="source id, repeatable or comma list (default: goes-glm; env LIGHTNING_SOURCES). "
-        f"Available: {', '.join(SOURCE_IDS)}. iitm-damini is an UNOFFICIAL feed (opt-in only)",
+        f"Available: {', '.join(SOURCE_IDS)}. iitm-damini and imd-lightning are UNOFFICIAL feeds (opt-in only)",
     )
     ap.add_argument(
         "--iitm-min-interval-s",
         type=float,
         default=60,
         help="minimum seconds between requests to the IITM feed (a sooner poll makes no request; "
+        "never below 60)",
+    )
+    ap.add_argument(
+        "--imd-min-interval-s",
+        type=float,
+        default=60,
+        help="minimum seconds between requests to the IMD service (a sooner poll makes no request; "
         "never below 60)",
     )
     ap.add_argument(
@@ -76,6 +83,7 @@ def main(argv=None, *, clock=time.monotonic, sleep=None, stop=None) -> int:
                 "keep_degraded": a.keep_degraded,
             },
             iitm={"min_interval_s": a.iitm_min_interval_s},
+            imd={"min_interval_s": a.imd_min_interval_s},
         )
     except ValueError as e:
         ap.error(str(e))

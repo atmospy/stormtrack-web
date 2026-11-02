@@ -167,7 +167,7 @@ jobs:
           PUBLIC_DATA_BASE: ${{ vars.PUBLIC_DATA_BASE }}
         run: |
           uv sync
-          uv run ingest-lightning --out "$RUNNER_TEMP/lightning" ${PUBLIC_DATA_BASE:+--prev-url "$PUBLIC_DATA_BASE"} --upload
+          uv run ingest-lightning --source goes-glm,imd-lightning --out "$RUNNER_TEMP/lightning" ${PUBLIC_DATA_BASE:+--prev-url "$PUBLIC_DATA_BASE"} --upload
 
   storm-history:
     name: Storm history and stats (all basins)
