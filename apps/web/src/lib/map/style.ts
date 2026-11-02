@@ -39,6 +39,18 @@ export function darkStyle(): StyleSpecification {
       paint: { 'line-color': '#16223a', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 16, 1.5] }
     },
     {
+      id: 'water_label', type: 'symbol', source: 'ofm', 'source-layer': 'water_name', minzoom: 2,
+      layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': font('Italic'), 'text-size': 11, 'text-letter-spacing': 0.15, 'text-max-width': 6 },
+      paint: { 'text-color': '#33507a', 'text-halo-color': C.halo, 'text-halo-width': 1 }
+    },
+    {
+      // Coastlines: the edge of the water polygons, drawn ABOVE the weather and satellite layers (which are
+      // inserted before water_label) so the coast stays visible under temperature, rain and cloud.
+      id: 'coastline', type: 'line', source: 'ofm', 'source-layer': 'water',
+      filter: ['==', 'class', 'ocean'],
+      paint: { 'line-color': 'rgba(206, 228, 255, 0.78)', 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.5, 5, 0.9, 9, 1.4], 'line-opacity': 0.95 }
+    },
+    {
       id: 'boundary_state', type: 'line', source: 'ofm', 'source-layer': 'boundary', minzoom: 4,
       filter: ['all', ['==', 'admin_level', 4], ['!=', 'maritime', 1], ['!=', 'disputed', 1]],
       paint: { 'line-color': C.boundaryState, 'line-width': 0.6, 'line-dasharray': [3, 2] }
@@ -48,11 +60,6 @@ export function darkStyle(): StyleSpecification {
       // OpenStreetMap, whose disputed-border lines differ. See scripts/make-boundaries.py.
       id: 'boundary_country', type: 'line', source: 'borders',
       paint: { 'line-color': C.boundary, 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.5, 6, 1.2], 'line-opacity': 0.9 }
-    },
-    {
-      id: 'water_label', type: 'symbol', source: 'ofm', 'source-layer': 'water_name', minzoom: 2,
-      layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': font('Italic'), 'text-size': 11, 'text-letter-spacing': 0.15, 'text-max-width': 6 },
-      paint: { 'text-color': '#33507a', 'text-halo-color': C.halo, 'text-halo-width': 1 }
     },
     {
       id: 'label_place_small', type: 'symbol', source: 'ofm', 'source-layer': 'place', minzoom: 6,
