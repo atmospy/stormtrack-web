@@ -53,6 +53,13 @@
     for (let i = 1; i < fixes.length; i++) if (Math.abs(fixes[i]!.t - app.validMs) < Math.abs(fixes[best]!.t - app.validMs)) best = i;
     return best;
   });
+  let fixList = $state<HTMLElement | null>(null);
+  // keep the highlighted fix in view as the slider moves
+  $effect(() => {
+    void activeFix;
+    const el = fixList?.querySelector<HTMLElement>('.fx.on');
+    if (fixList && el) fixList.scrollTop = el.offsetTop - fixList.clientHeight / 2 + el.clientHeight / 2;
+  });
   const fmtFix = (t: number) => new Date(t).toUTCString().slice(5, 22).replace(' GMT', '');
   function goto(t: number) {
     if (!app.scrubToMs(t)) toast.show('That time is outside the weather timeline', 'info');
@@ -145,7 +152,7 @@
       {#if fixes.length > 1}
         <div class="sec">
           <div class="label">Track fixes <span class="leg">UTC · click to jump</span></div>
-          <div class="fixes tnum">
+          <div class="fixes tnum" bind:this={fixList}>
             {#each fixes as x, i (i)}
               {@const c = categoryFromWind(x.w)}
               <button class="fx" class:on={i === activeFix} class:fc={x.fc} onclick={() => goto(x.t)} title={x.fc ? `Forecast +${x.tau} h` : 'Observed fix'}>
