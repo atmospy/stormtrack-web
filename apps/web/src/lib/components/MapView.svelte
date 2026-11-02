@@ -23,6 +23,8 @@
   import { ACTIVE_HIT_LAYERS, HISTORY_LAYER, addStormLayers, setActiveData, setHighlight, setStormVisibility, startPulse } from '#lib/map/storms';
   import { setSatellite } from '#lib/map/satellite';
   import { cloudTime, setClouds } from '#lib/map/clouds';
+  import { SONDE_HIT_LAYERS, addSondeLayers, setSondeData, setSondeVisibility, sondePopup } from '#lib/map/sondes';
+  import { sondes } from '#lib/sondes/state.svelte';
   import { NOWCAST_HIT_LAYERS, addNowcastLayers, nowcastPopup, setNowcastData, setNowcastVisibility } from '#lib/map/nowcast';
   import { HAZARD_HIT_LAYERS, addHazardLayers, popupContent, setHazardData, setHazardVisibility } from '#lib/map/hazards';
   import { addArrowLayer, updateArrows } from '#lib/map/arrows';
@@ -80,6 +82,8 @@
         addStormLayers(m);
         addHazardLayers(m);
         addLightningLayers(m, 'st-history');
+        addSondeLayers(m);
+        sondes.onData((g) => setSondeData(m, g));
         wire(m);
         map = m;
         const c0 = m.getCenter();
@@ -157,6 +161,16 @@
         if (pt && typeof pt.properties?.t === 'number') app.scrubToMs(pt.properties.t);
         const at = app.active ? groupStorms(app.active).get(sid)?.position.geometry.coordinates : undefined;
         if (at) meteo.open(at[0]!, at[1]!);
+        return;
+      }
+      const sd = hits(m, e, SONDE_HIT_LAYERS)[0];
+      if (sd && app.layers.sondes) {
+        popup?.remove();
+        popup = new maplibre.Popup({ offset: 10, closeButton: true, maxWidth: '240px' })
+          .setLngLat((sd.geometry as GeoJSON.Point).coordinates as [number, number])
+          .setDOMContent(sondePopup(sd.properties as Record<string, unknown>))
+          .addTo(m);
+        gate.interact();
         return;
       }
       const hz = hits(m, e, HAZARD_HIT_LAYERS)[0];
@@ -280,6 +294,12 @@
   });
   $effect(() => {
     if (ready && map) setSatellite(map, app.layers.satellite && app.availability.satellite === 'ready', app.satellite);
+  });
+  $effect(() => {
+    if (!(ready && map)) return;
+    setSondeVisibility(map, app.layers.sondes);
+    if (app.layers.sondes) void sondes.start();
+    else sondes.stop();
   });
   $effect(() => {
     if (ready && map) setClouds(map, app.layers.clouds, cloudTime(app.validMs, Date.now()));

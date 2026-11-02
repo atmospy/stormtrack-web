@@ -3,7 +3,7 @@
  * Everything is optional: a missing or invalid parameter simply falls back to the app default.
  *   ?c=18.00,80.00,3.2&m=gfs&f=wind&l=850&t=20261101T12&on=wind,storms&s=a:IO042026&lw=15&pin=19.1,72.8
  */
-export const LAYER_KEYS = ['wind', 'storms', 'history', 'events', 'quakes', 'fires', 'lightning', 'nowcast', 'satellite', 'clouds'] as const;
+export const LAYER_KEYS = ['wind', 'storms', 'history', 'events', 'quakes', 'fires', 'lightning', 'nowcast', 'satellite', 'clouds', 'sondes'] as const;
 export type ShareLayer = (typeof LAYER_KEYS)[number];
 export const VARIABLE_KEYS = ['wind', 'pressure', 'temperature', 'precipitation'] as const;
 export const LIGHTNING_WINDOWS = [5, 15, 60] as const;
