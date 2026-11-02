@@ -77,7 +77,10 @@
   let lastId = '';
   $effect(() => {
     const id = sel ? `${sel.type}:${sel.id}` : '';
-    if (id && id !== lastId && (bundle || hist)) zoom();
+    if (id && id !== lastId && (bundle || hist)) {
+      zoom();
+      if (bundle) app.layers.clouds = true; // see the storm's clouds under its track
+    }
     lastId = id;
   });
 

@@ -22,6 +22,7 @@
   import { darkStyle } from '#lib/map/style';
   import { ACTIVE_HIT_LAYERS, HISTORY_LAYER, addStormLayers, setActiveData, setHighlight, setStormVisibility, startPulse } from '#lib/map/storms';
   import { setSatellite } from '#lib/map/satellite';
+  import { cloudTime, setClouds } from '#lib/map/clouds';
   import { NOWCAST_HIT_LAYERS, addNowcastLayers, nowcastPopup, setNowcastData, setNowcastVisibility } from '#lib/map/nowcast';
   import { HAZARD_HIT_LAYERS, addHazardLayers, popupContent, setHazardData, setHazardVisibility } from '#lib/map/hazards';
   import { addArrowLayer, updateArrows } from '#lib/map/arrows';
@@ -279,6 +280,9 @@
   });
   $effect(() => {
     if (ready && map) setSatellite(map, app.layers.satellite && app.availability.satellite === 'ready', app.satellite);
+  });
+  $effect(() => {
+    if (ready && map) setClouds(map, app.layers.clouds, cloudTime(app.validMs, Date.now()));
   });
   $effect(() => {
     if (ready && map && app.nowcast) setNowcastData(map, app.nowcast);
