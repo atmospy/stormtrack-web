@@ -60,7 +60,7 @@ class WeatherRuntime {
       return { ref: refFor(lm.base, m, f, i), nextRef: j !== i ? refFor(lm.base, m, f, j) : null };
     };
     const windF = app.variable === 'wind' || app.overlay ? windFieldAt(m, app.level) : null;
-    const scF = app.variable !== 'wind' ? scalarField(m, app.variable) : null;
+    const scF = app.variable !== 'wind' ? scalarField(m, app.variable, app.level) : null;
     return { wind: pick(windF), scalar: pick(scF) };
   }
 
@@ -177,7 +177,7 @@ class WeatherRuntime {
       if (e.id === app.modelId) continue;
       await this.ensureModel(e.id);
       const other = app.models[e.id];
-      if (other) add(other.base, other.model, app.variable === 'wind' ? windFieldAt(other.model, app.level) : scalarField(other.model, app.variable));
+      if (other) add(other.base, other.model, app.variable === 'wind' ? windFieldAt(other.model, app.level) : scalarField(other.model, app.variable, app.level));
     }
     for (const u of urls.slice(0, 6)) {
       try {

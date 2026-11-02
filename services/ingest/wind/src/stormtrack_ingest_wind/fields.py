@@ -26,7 +26,7 @@ class FieldSpec:
     slug: str  # "wind_850", "mslp"
     kind: str  # vector | scalar
     units: str
-    group: str  # wind | mslp | t2m | precip  (what --fields selects)
+    group: str  # wind | mslp | t2m | t | precip  (what --fields selects; "t" = temperature on pressure levels)
     level: Optional[Tuple[str, int, str]] = None  # (type, value, label)
     vrange: Optional[VectorRange] = None
     srange: Optional[Tuple[float, float]] = None
@@ -74,6 +74,19 @@ def _wind(level: str) -> FieldSpec:
     )
 
 
+def _temp(p: int) -> FieldSpec:
+    """Air temperature on a pressure level. One wide range for all levels: 16 bits over 150 K is 0.002 K."""
+    return FieldSpec(
+        f"t@{p}hPa",
+        f"t_{p}",
+        "scalar",
+        "°C",
+        "t",
+        ("pressure", p, f"{p} hPa"),
+        srange=(-100.0, 50.0),
+    )
+
+
 MSLP = FieldSpec("mslp", "mslp", "scalar", "hPa", "mslp", srange=(930.0, 1070.0))
 T2M = FieldSpec("t2m", "t2m", "scalar", "°C", "t2m", srange=(-60.0, 60.0))
 PRECIP = FieldSpec(
@@ -87,10 +100,13 @@ PRECIP = FieldSpec(
 )
 
 ALL_FIELDS: List[FieldSpec] = (
-    [_wind("10m")] + [_wind(str(p)) for p in PRESSURE_LEVELS] + [MSLP, T2M, PRECIP]
+    [_wind("10m")]
+    + [_wind(str(p)) for p in PRESSURE_LEVELS]
+    + [MSLP, T2M, PRECIP]
+    + [_temp(p) for p in PRESSURE_LEVELS]
 )
 BY_SLUG = {f.slug: f for f in ALL_FIELDS}
-GROUPS = ("wind", "mslp", "t2m", "precip")
+GROUPS = ("wind", "mslp", "t2m", "precip", "t")
 
 
 def parse_levels(arg: Optional[str]) -> List[str]:
@@ -109,13 +125,15 @@ def parse_levels(arg: Optional[str]) -> List[str]:
 
 
 def select(fields: Optional[str] = None, levels: Optional[str] = None) -> List[FieldSpec]:
-    """`--fields wind,mslp,...` (or exact slugs/ids) and `--levels` (wind only) -> FieldSpecs."""
+    """`--fields wind,mslp,...` (or exact slugs/ids) and `--levels` (wind and temperature levels) -> FieldSpecs."""
     lv = set(parse_levels(levels))
     toks = [t.strip() for t in (fields or ",".join(GROUPS)).split(",") if t.strip()]
     chosen: List[FieldSpec] = []
     for t in toks:
         if t in GROUPS:
-            chosen += [f for f in ALL_FIELDS if f.group == t and (t != "wind" or _lv(f) in lv)]
+            chosen += [
+                f for f in ALL_FIELDS if f.group == t and (t not in ("wind", "t") or _lv(f) in lv)
+            ]
         elif t in BY_SLUG:
             chosen.append(BY_SLUG[t])
         else:

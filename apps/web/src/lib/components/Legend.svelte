@@ -8,10 +8,13 @@
 
   $effect(() => {
     const v = app.variable;
-    ramp = null;
-    if (v === 'wind') return;
+    const lv = app.level;
+    if (v === 'wind') {
+      ramp = null;
+      return;
+    }
     let live = true;
-    void rampFor(v).then((r) => live && (ramp = r)).catch(() => {});
+    void rampFor(v, lv).then((r) => live && (ramp = r)).catch(() => {});
     return () => (live = false);
   });
 

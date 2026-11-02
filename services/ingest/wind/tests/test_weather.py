@@ -95,7 +95,11 @@ def test_units_conversion_and_refusal():
 def test_field_selection():
     assert [f.slug for f in fields.select("wind", "10m,850")] == ["wind_10m", "wind_850"]
     assert [f.slug for f in fields.select("mslp,wind_250")] == ["mslp", "wind_250"]
-    assert len(fields.select()) == 9
+    assert len(fields.select()) == 14
+    assert [f.slug for f in fields.select("t,wind_10m")] == [
+        f"t_{p}" for p in fields.PRESSURE_LEVELS
+    ] + ["wind_10m"]
+    assert [f.slug for f in fields.select("t", "500")] == ["t_500"]
     with pytest.raises(ValueError):
         fields.select("nope")
     with pytest.raises(ValueError):
