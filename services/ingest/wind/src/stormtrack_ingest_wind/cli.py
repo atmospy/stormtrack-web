@@ -35,7 +35,28 @@ def main(argv=None) -> int:
         help="nearest = every Nth point (default); mean = box average",
     )
     ap.add_argument("--workers", type=int, default=4)
-    ap.add_argument("--keep", type=int, default=2, help="runs to keep (default 2)")
+    ap.add_argument("--keep", type=int, default=2, help="runs to keep per model (default 2)")
+    ap.add_argument(
+        "--models",
+        default="gfs",
+        help="comma list of gfs, ecmwf-ifs, ecmwf-aifs (default gfs)",
+    )
+    ap.add_argument(
+        "--fields",
+        default=None,
+        help="comma list of wind, mslp, t2m, precip (default all) or exact slugs e.g. wind_850",
+    )
+    ap.add_argument(
+        "--levels",
+        default=None,
+        help="wind levels, comma list of 10m,850,700,500,300,250 (default all)",
+    )
+    ap.add_argument(
+        "--upper-step",
+        type=int,
+        default=None,
+        help="publish pressure-level winds only every N hours (size reduction; default = --step)",
+    )
     ap.add_argument("--dry-run", action="store_true", help="pick+verify the run, write nothing")
     ap.add_argument("--upload", action="store_true", help="upload to S3/R2 using R2_* env vars")
     ap.add_argument(
@@ -53,30 +74,39 @@ def main(argv=None) -> int:
 
         return run_selftest()
 
-    from . import gfs, pipeline
+    from . import fields, gfs, models, weather
 
     out = a.out or default_out()
     run = gfs.parse_run(a.run) if a.run else None
-    latest = pipeline.ingest(
+    try:
+        model_list = models.get_models(a.models)
+        specs = fields.select(a.fields, a.levels)
+    except ValueError as e:
+        ap.error(str(e))
+    res = weather.ingest_all(
         out,
-        run=run,
+        model_list,
+        specs,
+        runs={m.id: run for m in model_list} if run else None,
+        dry_run=a.dry_run,
+        keep=a.keep,
         hours=a.hours,
         step=a.step,
+        upper_step=a.upper_step,
         res=a.res,
         method=a.method,
         workers=a.workers,
-        dry_run=a.dry_run,
-        keep=a.keep,
     )
-    if a.upload and latest is not None:
+    print(weather.report(res))
+    if a.upload and res["models"]:
         from . import upload
 
-        upload.upload_run(
+        upload.upload_all(
             upload.client_from_env(),
             os.environ["R2_BUCKET"],
             out,
-            latest,
+            res,
             os.environ.get("R2_PREFIX", ""),
             a.keep,
         )
-    return 0
+    return 1 if res["errors"] else 0

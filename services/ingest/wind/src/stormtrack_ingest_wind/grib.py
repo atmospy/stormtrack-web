@@ -36,6 +36,37 @@ def split_messages(buf: bytes) -> List[bytes]:
     return out
 
 
+@dataclass
+class Msg:
+    """One decoded GRIB2 message, normalised to north-first rows, longitudes -180..180 ascending."""
+
+    values: np.ndarray  # (nlat, nlon) float32, native GRIB units
+    units: str
+    short_name: str
+    type_of_level: str
+    level: int
+    start_step: int
+    lats: np.ndarray
+    lons: np.ndarray
+    d: float  # source spacing, degrees
+
+
+def decode_message(msg: bytes) -> Msg:
+    import eccodes
+
+    name, vals, lats, lons, di = _decode_one(msg)
+    h = eccodes.codes_new_from_message(msg)
+    try:
+        g = lambda k: eccodes.codes_get(h, k)  # noqa: E731
+        units, tol, level, start = g("units"), g("typeOfLevel"), g("level"), g("startStep")
+    finally:
+        eccodes.codes_release(h)
+    lons = ((lons + 180.0) % 360.0) - 180.0
+    order = np.argsort(lons, kind="stable")
+    vals = np.nan_to_num(vals[:, order]).astype(np.float32)
+    return Msg(vals, units, name, tol, int(level), int(start), lats, lons[order], di)
+
+
 def _decode_one(msg: bytes):
     import eccodes
 

@@ -23,6 +23,11 @@ def run_id(run: dt.datetime) -> str:
     return f"{run:%Y%m%dT%H}"
 
 
+def run_id_from_iso(iso: str) -> str:
+    """'2026-11-01T12:00:00Z' -> '20261101T12'."""
+    return f"{iso[0:4]}{iso[5:7]}{iso[8:10]}T{iso[11:13]}"
+
+
 def parse_run(s: str) -> dt.datetime:
     s = s.strip().replace("-", "").replace("T", "").replace("Z", "")
     r = dt.datetime.strptime(s[:10], "%Y%m%d%H").replace(tzinfo=dt.timezone.utc)

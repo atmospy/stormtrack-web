@@ -1,7 +1,7 @@
 [project]
 name = "stormtrack-ingest-wind"
 version = "0.1.0"
-description = "GFS 10 m wind -> PNG textures + latest.json for StormTrack Web"
+description = "GFS / ECMWF IFS / AIFS weather fields -> PNG textures + latest.json for StormTrack Web"
 requires-python = ">=3.9"
 dependencies = [
   "numpy>=1.23",
@@ -21,6 +21,7 @@ dev = ["pytest>=7", "boto3>=1.34"]
 [project.scripts]
 ingest-wind = "stormtrack_ingest_wind.cli:main"
 verify-wind = "stormtrack_ingest_wind.verify:main"
+verify-weather = "stormtrack_ingest_wind.verify:main_weather"
 
 [build-system]
 requires = ["hatchling"]

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import random
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -10,6 +12,24 @@ import urllib.request
 log = logging.getLogger("stormtrack.wind")
 UA = "stormtrack-ingest-wind/0.1 (+https://github.com/atmospy/stormtrack-web)"
 STATS = {"bytes": 0, "requests": 0}
+_LOCK = threading.Lock()
+
+
+# Minimum seconds between requests per host substring. ECMWF's S3 answers 503 SlowDown in bursts
+# (even to HEAD/index requests), so we pace it; NOAA's bucket copes with full parallelism.
+PACE = {"ecmwf-forecasts": 0.3}
+_NEXT = {}
+
+
+def _pace(url: str) -> None:
+    for host, gap in PACE.items():
+        if host in url:
+            with _LOCK:
+                t = max(time.monotonic(), _NEXT.get(host, 0.0))
+                _NEXT[host] = t + gap
+            wait = t - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
 
 
 class NotFound(Exception):
@@ -25,7 +45,7 @@ def _open(req, timeout):
         raise
 
 
-def _retry(fn, tries=5, base=1.0):
+def _retry(fn, tries=20, base=1.0):
     for i in range(tries):
         try:
             return fn()
@@ -34,7 +54,9 @@ def _retry(fn, tries=5, base=1.0):
         except Exception as e:  # network / 5xx / truncated read
             if i == tries - 1:
                 raise
-            wait = base * 2**i
+            wait = min(base * 1.6**i, 12) * (
+                0.75 + 0.5 * random.random()
+            )  # jitter: S3 503 SlowDown
             log.warning("retry %d/%d after %s: %s", i + 1, tries - 1, wait, e)
             time.sleep(wait)
 
@@ -43,6 +65,7 @@ def get(url: str, byte_range=None, timeout: float = 60) -> bytes:
     """GET (optionally `bytes=a-b` inclusive; b may be None for open-ended)."""
 
     def go():
+        _pace(url)
         req = urllib.request.Request(url, headers={"User-Agent": UA})
         if byte_range is not None:
             a, b = byte_range
@@ -53,8 +76,9 @@ def get(url: str, byte_range=None, timeout: float = 60) -> bytes:
             want = byte_range[1] - byte_range[0] + 1
             if len(data) != want:
                 raise IOError(f"short read {len(data)} != {want}")
-        STATS["bytes"] += len(data)
-        STATS["requests"] += 1
+        with _LOCK:
+            STATS["bytes"] += len(data)
+            STATS["requests"] += 1
         return data
 
     return _retry(go)
@@ -64,6 +88,7 @@ def head(url: str, timeout: float = 20) -> bool:
     """True if the object exists."""
 
     def go():
+        _pace(url)
         req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
         try:
             with _open(req, timeout):

@@ -60,3 +60,12 @@ def resample(f: Field, res: float, method: str = "nearest"):
         float(f.lats[0] - (h - 1) * res),
     )
     return np.ascontiguousarray(u), np.ascontiguousarray(v), g
+
+
+def resample_array(
+    a: np.ndarray, d: float, lons: np.ndarray, lats: np.ndarray, res: float, method: str = "nearest"
+):
+    """Scalar version of `resample` for a normalised (north-first, -180..180) array -> (arr, Grid)."""
+    f = Field(a, a, lats, lons, d)
+    u, _, g = resample(f, res, method)
+    return u, g

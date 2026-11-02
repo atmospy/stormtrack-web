@@ -27,5 +27,34 @@ def run_selftest() -> int:
     assert rt["ok"], rt
     sn = verify.sanity(u, v)
     log.info("selftest sanity: %s", sn)
+    _selftest_weather()
     print("selftest OK")
     return 0
+
+
+def _selftest_weather() -> None:
+    """All three models x all fields through a mocked bucket into a temp dir (no network)."""
+    import datetime as dt
+    import tempfile
+
+    from . import fields, http, models, weather
+
+    world = fixtures.FakeWorld(2.0, {(m, "2026110112") for m in models.MODELS})
+    run = dt.datetime(2026, 11, 1, 12, tzinfo=dt.timezone.utc)
+    saved = http.get, http.head
+    http.get, http.head = world.get, world.head
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            res = weather.ingest_all(
+                tmp,
+                list(models.MODELS.values()),
+                fields.select(),
+                runs={m: run for m in models.MODELS},
+                hours=6,
+                res=4.0,
+            )
+            assert not res["errors"], res["errors"]
+            assert verify.verify_tree(tmp, "gfs", {0, 6}) >= 0
+            log.info("selftest weather: %s", sorted(res["models"]))
+    finally:
+        http.get, http.head = saved
