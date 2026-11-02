@@ -33,6 +33,8 @@
   let el: HTMLDivElement;
   let map: MlMap | undefined = $state.raw();
   let ready = $state(false);
+  /** the basemap has drawn: until then the map is hidden so nobody sees a bare, tile-less globe */
+  let shown = $state(false);
   let maplibre: typeof MapLibre;
   let windLayer: WindLayerLike | null = $state.raw(null);
   let creatingWind = false;
@@ -89,6 +91,14 @@
         app.center = { lon: c0.lng, lat: c0.lat };
         app.zoom = m.getZoom();
         ready = true;
+        // reveal once the basemap tiles are in; 'idle' never fires while the wind particles keep repainting
+        const reveal = () => {
+          if (shown || !m.areTilesLoaded()) return;
+          shown = true;
+          m.off('render', reveal);
+        };
+        m.on('render', reveal);
+        setTimeout(() => (shown = true), 4000); // never stay hidden if a tile or source is slow
         (window as unknown as { __map?: MlMap }).__map = m;
       });
       m.on('error', (e) => {
@@ -508,7 +518,7 @@
     const r = app.flyRequest;
     if (!(ready && map && r) || r.n === lastFly) return;
     lastFly = r.n;
-    const duration = app.reducedMotion ? 0 : 1900;
+    const duration = app.reducedMotion || !shown ? 0 : 1900;
     const wide = window.innerWidth > 900;
     const left = Math.max(leftClear(), 60);
     const right = wide && app.selection ? 420 : 60;
@@ -523,15 +533,17 @@
   });
 </script>
 
-<div bind:this={el} class="map" aria-label="Interactive globe map" role="application"></div>
-{#if !ready}
-  <div class="boot" aria-hidden="true"><div class="orb"></div></div>
+<div bind:this={el} class="map" class:on={shown} aria-label="Interactive globe map" role="application"></div>
+{#if !shown}
+  <div class="boot" role="status" aria-label="Loading map"><div class="ring" aria-hidden="true"></div></div>
 {/if}
 
 <style>
-  .map { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, #0b1730 0%, #050914 70%); }
+  .map { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, #0b1730 0%, #050914 70%); opacity: 0; transition: opacity 0.6s ease-out; }
+  .map.on { opacity: 1; }
   .boot { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
-  .orb { width: 38vmin; height: 38vmin; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #16294d, #070d1c 70%); box-shadow: 0 0 60px rgba(60, 130, 255, 0.25), inset 0 0 40px rgba(94, 224, 255, 0.08); animation: breathe 2.4s ease-in-out infinite; }
-  @keyframes breathe { 50% { transform: scale(1.03); box-shadow: 0 0 80px rgba(60, 130, 255, 0.4), inset 0 0 40px rgba(94, 224, 255, 0.12); } }
+  .ring { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(94, 224, 255, 0.18); border-top-color: rgba(94, 224, 255, 0.9); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .ring { animation: none; } .map { transition: none; } }
   :global(.pin) { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; background: rgba(94, 224, 255, 0.35); box-shadow: 0 0 0 4px rgba(94, 224, 255, 0.2), 0 0 16px rgba(94, 224, 255, 0.8); }
 </style>
