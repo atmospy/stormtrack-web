@@ -59,6 +59,38 @@ def _list(series) -> list:
     return [num(v) for v in series]
 
 
+LATE_WARNING = pd.Timedelta(minutes=30)
+
+
+def latest_warning_fix(obs: pd.DataFrame, fc: Optional[pd.DataFrame]) -> pd.DataFrame:
+    """Append the warning's own position (forecast lead time 0) when it is newer than the last best-track fix.
+
+    The best-track file lags the live warning by several hours, so without this the marker and the end of the
+    observed track sit at an old position while the forecast already starts somewhere else.
+    """
+    if fc is None or fc.empty or "tau" not in fc or "init" not in fc:
+        return obs
+    now_fix = fc[fc["tau"] == 0]
+    if now_fix.empty:
+        return obs
+    r = now_fix.sort_values("init").iloc[-1]
+    if pd.isna(r["lat"]) or pd.isna(r["lon"]) or pd.isna(r["init"]):
+        return obs
+    last = obs.iloc[-1]
+    if pd.Timestamp(r["init"]) <= pd.Timestamp(last["time"]) + LATE_WARNING:
+        return obs
+    row = last.copy()
+    row["time"] = pd.Timestamp(r["init"])
+    row["lat"], row["lon"] = float(r["lat"]), float(r["lon"])
+    if "vmax" in r and not pd.isna(r["vmax"]):
+        row["wind"] = float(r["vmax"])
+    if "pressure" in row.index:
+        row["pressure"] = float("nan")  # the warning gives no central pressure
+    return pd.concat([obs, row.to_frame().T], ignore_index=True).astype(
+        obs.dtypes.to_dict(), errors="ignore"
+    )
+
+
 def position_feature(obs: pd.DataFrame, agency: str) -> dict:
     """Point feature for the latest fix of one storm (obs sorted by time)."""
     ts = translation_speed(obs).sort_values("time")
@@ -199,6 +231,14 @@ def build_active(
         obs = bt.observations
         for sid, o in obs.groupby("storm_id", sort=True):
             o = o.sort_values("time")
+            # the forecast first: a warning can be newer than the best-track file, and then its position is
+            # the storm's latest fix (marker and track end must be where the forecast starts)
+            fc, fc_err = None, None
+            try:
+                fc = fetch_forecast_fn(sid, src)
+            except Exception as exc2:  # noqa: BLE001 - JTWC forecast mirrors are often blocked
+                fc_err = exc2
+            o = latest_warning_fix(o, fc)
             features.append(position_feature(o, AGENCY[src]))
             tr = track_feature(o)
             if tr:
@@ -210,14 +250,17 @@ def build_active(
                     "agency": AGENCY[src],
                 }
             )
-            try:
-                fc = fetch_forecast_fn(sid, src)
-                fcf = forecast_features(sid, fc, radii, proxy=(src == "jtwc"))
-                features += fcf
-                report["forecast_ok" if fcf else "forecast_unavailable"].append(sid)
-            except Exception as exc2:  # noqa: BLE001 - JTWC forecast mirrors are often blocked
-                log.info("no forecast for %s: %s", sid, str(exc2)[:200])
+            if fc is None:
+                log.info("no forecast for %s: %s", sid, str(fc_err)[:200])
                 report["forecast_unavailable"].append(sid)
+                continue
+            try:
+                fcf = forecast_features(sid, fc, radii, proxy=(src == "jtwc"))
+            except Exception as exc3:  # noqa: BLE001
+                log.info("forecast for %s unusable: %s", sid, str(exc3)[:200])
+                fcf = []
+            features += fcf
+            report["forecast_ok" if fcf else "forecast_unavailable"].append(sid)
     order = {"position": 0, "track": 1, "forecast": 2, "cone": 3}
     features.sort(key=lambda f: (f["properties"]["id"], order[f["properties"]["kind"]]))
     fc_ = {

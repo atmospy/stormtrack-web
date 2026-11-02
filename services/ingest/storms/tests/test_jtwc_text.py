@@ -51,3 +51,39 @@ def test_jtwc_cone_is_labelled_proxy():
         f for f in forecast_features("AL012026", df, radii) if f["properties"]["kind"] == "cone"
     )
     assert "proxy" not in nhc["properties"]
+
+
+def test_newer_warning_position_becomes_the_latest_fix():
+    import pandas as pd
+    from storms_ingest.active import latest_warning_fix
+
+    obs = pd.DataFrame(
+        {
+            "storm_id": ["WP302026"] * 2,
+            "time": pd.to_datetime(["2026-11-02 00:00", "2026-11-02 06:00"]),
+            "lat": [22.4, 22.6],
+            "lon": [141.8, 140.9],
+            "wind": [70.0, 70.0],
+            "pressure": [960.0, 958.0],
+            "name": ["IN-FA"] * 2,
+            "basin": ["WP"] * 2,
+        }
+    )
+    fc = pd.DataFrame(
+        {
+            "init": pd.to_datetime(["2026-11-02 12:00"] * 2),
+            "tau": [0, 12],
+            "lat": [23.0, 23.4],
+            "lon": [140.2, 139.0],
+            "vmax": [65.0, 60.0],
+            "tech": ["JTWC"] * 2,
+        }
+    )
+    out = latest_warning_fix(obs, fc)
+    assert len(out) == 3 and out.iloc[-1]["time"] == pd.Timestamp("2026-11-02 12:00")
+    assert (out.iloc[-1]["lat"], out.iloc[-1]["lon"], out.iloc[-1]["wind"]) == (23.0, 140.2, 65.0)
+    assert pd.isna(out.iloc[-1]["pressure"]) and out.iloc[-1]["name"] == "IN-FA"
+    # an older or equal warning, no forecast, or no lead-time-0 row leaves the observations alone
+    assert len(latest_warning_fix(obs, fc.assign(init=pd.Timestamp("2026-11-02 06:10")))) == 2
+    assert latest_warning_fix(obs, None) is obs
+    assert len(latest_warning_fix(obs, fc[fc["tau"] > 0])) == 2
