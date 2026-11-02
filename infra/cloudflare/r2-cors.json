@@ -5,8 +5,9 @@
         "origins": [
           "https://stormtrack-web.pages.dev",
           "https://*.stormtrack-web.pages.dev",
-          "https://stormtrack.example",
+          "https://stormtrack.labshope.com",
           "http://localhost:5173",
+          "http://127.0.0.1:5173",
           "http://localhost:4173"
         ],
         "methods": ["GET", "HEAD"],
