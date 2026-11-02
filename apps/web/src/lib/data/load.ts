@@ -10,7 +10,9 @@ import {
   type ActiveStorms,
   type BasinStats,
   type HazardIndex,
-  type HistoryCollection
+  type HistoryCollection,
+  type NowcastFile,
+  parseNowcast
 } from './contracts';
 import { parseHistoryIndex, type HistoryIndex } from './history';
 import { parseCoverage, parseFlashes, parseLightningIndex, type Flashes, type LightningIndex } from './lightning';
@@ -207,3 +209,6 @@ export const loadHazardIndex = (signal?: AbortSignal) => resolve<HazardIndex>('h
 export const loadHazardLayer = (name: 'events' | 'quakes' | 'fires', base: string, signal?: AbortSignal) =>
   resolve<GeoJSON.FeatureCollection<GeoJSON.Point>>(`hazards/${name}.geojson`, parseHazardPoints, signal, [base]);
 
+
+/** Nowcast has no bundled sample: a missing file just means the layer is unavailable. */
+export const loadNowcast = (signal?: AbortSignal) => resolve<NowcastFile>('nowcast/latest.geojson', parseNowcast, signal, [DATA_BASE]);

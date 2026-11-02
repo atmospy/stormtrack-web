@@ -18,6 +18,7 @@
     { key: 'events', label: 'Natural events', icon: 'event', hint: 'NASA EONET', key_: 'E' },
     { key: 'quakes', label: 'Earthquakes', icon: 'quake', hint: 'USGS 24 h', key_: 'Q' },
     { key: 'fires', label: 'Fire hotspots', icon: 'fire', hint: 'NASA FIRMS', key_: 'F' },
+    { key: 'nowcast', label: 'India warnings', icon: 'event', hint: 'IMD district nowcast, ~3 h', key_: 'N' },
     { key: 'lightning', label: 'Lightning', icon: 'bolt', hint: 'GOES GLM · Americas', key_: 'G' }
   ];
   function count(k: LayerKey): string {
@@ -27,6 +28,7 @@
       const n = app.hazardIndex?.layers[k]?.count;
       return n === undefined ? '' : String(n);
     }
+    if (k === 'nowcast') return app.nowcast ? String(app.nowcast.features.length) : '';
     return '';
   }
   function sub(k: LayerKey, hint: string): string {

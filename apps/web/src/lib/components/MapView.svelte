@@ -21,6 +21,7 @@
   import { groupStorms } from '#lib/data/active';
   import { darkStyle } from '#lib/map/style';
   import { ACTIVE_HIT_LAYERS, HISTORY_LAYER, addStormLayers, setActiveData, setHighlight, setStormVisibility, startPulse } from '#lib/map/storms';
+  import { NOWCAST_HIT_LAYERS, addNowcastLayers, nowcastPopup, setNowcastData, setNowcastVisibility } from '#lib/map/nowcast';
   import { HAZARD_HIT_LAYERS, addHazardLayers, popupContent, setHazardData, setHazardVisibility } from '#lib/map/hazards';
   import { addArrowLayer, updateArrows } from '#lib/map/arrows';
   import { ensureHistory } from '#lib/data/boot';
@@ -73,6 +74,7 @@
         if (disposed) return;
         addArrowLayer(m);
         addIsobarLayers(m, 'water_label');
+        addNowcastLayers(m, 'st-history');
         addStormLayers(m);
         addHazardLayers(m);
         addLightningLayers(m, 'st-history');
@@ -132,7 +134,7 @@
         raf = 0;
         if (!lastEv) return;
         const ev = lastEv;
-        const interactive = [...ACTIVE_HIT_LAYERS, ...HAZARD_HIT_LAYERS, ...(app.layers.history ? [HISTORY_LAYER] : [])];
+        const interactive = [...ACTIVE_HIT_LAYERS, ...HAZARD_HIT_LAYERS, ...(app.layers.nowcast ? NOWCAST_HIT_LAYERS : []), ...(app.layers.history ? [HISTORY_LAYER] : [])];
         m.getCanvas().style.cursor = hits(m, ev, interactive, 5).length ? 'pointer' : '';
         if (app.readout?.pinned) return;
         const { lng, lat } = ev.lngLat;
@@ -168,6 +170,18 @@
           .addTo(m);
         gate.interact();
         return;
+      }
+      if (app.layers.nowcast) {
+        const nc = hits(m, e, NOWCAST_HIT_LAYERS)[0];
+        if (nc) {
+          popup?.remove();
+          popup = new maplibre.Popup({ offset: 4, closeButton: true, maxWidth: '300px' })
+            .setLngLat(e.lngLat)
+            .setDOMContent(nowcastPopup(nc.properties as Record<string, unknown>))
+            .addTo(m);
+          gate.interact();
+          return;
+        }
       }
       if (app.layers.history) {
         const h = hits(m, e, [HISTORY_LAYER], 6)[0];
@@ -258,6 +272,12 @@
       const d = app.hazards[k];
       if (d) setHazardData(map, k, d);
     }
+  });
+  $effect(() => {
+    if (ready && map && app.nowcast) setNowcastData(map, app.nowcast);
+  });
+  $effect(() => {
+    if (ready && map) setNowcastVisibility(map, app.layers.nowcast && app.availability.nowcast === 'ready');
   });
   $effect(() => {
     if (!(ready && map)) return;
