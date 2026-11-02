@@ -114,7 +114,7 @@ jobs:
           uv run ingest-storms --only active --out "$RUNNER_TEMP/storms" ${PUBLIC_DATA_BASE:+--prev-url "$PUBLIC_DATA_BASE"} --upload
 
   hazards:
-    name: Hazards (EONET, USGS, FIRMS, IMD nowcast)
+    name: Hazards (EONET, USGS, FIRMS, IMD nowcast and satellite)
     if: >-
       vars.INGEST_ENABLED != 'false' &&
       ((github.event_name == 'schedule' && github.event.schedule == '13,33,53 * * * *') ||
@@ -147,6 +147,13 @@ jobs:
         continue-on-error: true
         working-directory: services/ingest/hazards
         run: uv run ingest-nowcast --out "$RUNNER_TEMP/hazards" --upload
+      - name: Ingest INSAT infrared image (IMD) and upload to R2
+        if: steps.detect.outputs.present == 'true'
+        continue-on-error: true
+        working-directory: services/ingest/hazards
+        env:
+          PUBLIC_DATA_BASE: ${{ vars.PUBLIC_DATA_BASE }}
+        run: uv run ingest-satellite --out "$RUNNER_TEMP/hazards" ${PUBLIC_DATA_BASE:+--prev-url "$PUBLIC_DATA_BASE"} --upload
 
   lightning:
     name: Lightning (GOES GLM)

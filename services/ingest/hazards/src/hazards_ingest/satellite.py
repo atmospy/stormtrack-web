@@ -34,7 +34,9 @@ BASE = "https://hgmg.imd.gov.in:8443/geoserver/imd_ws/wms"
 IMAGE_NAME = "insat-ir.jpg"
 META_NAME = "insat-ir.json"
 MIN_BYTES = 50_000  # a WMS error comes back as a few hundred bytes of XML
-LICENCE = "IMD publishes no licence or terms for this service; credit the India Meteorological Department"
+LICENCE = (
+    "IMD publishes no licence or terms for this service; credit the India Meteorological Department"
+)
 ATTRIBUTION = "Satellite image: INSAT, India Meteorological Department (IMD)"
 
 
@@ -99,12 +101,23 @@ def _read_prev(out: Path, base_url: str | None) -> dict | None:
 
 def main(argv=None, fetch=None, now=None) -> int:
     ap = argparse.ArgumentParser(prog="ingest-satellite", description=__doc__)
-    ap.add_argument("--out", default=os.environ.get("PUBLIC_DATA_DIR", "public-data"), help="public-data directory")
-    ap.add_argument("--prev-url", default=None, help="public data base URL, to keep changed_at on a stateless runner")
+    ap.add_argument(
+        "--out",
+        default=os.environ.get("PUBLIC_DATA_DIR", "public-data"),
+        help="public-data directory",
+    )
+    ap.add_argument(
+        "--prev-url",
+        default=None,
+        help="public data base URL, to keep changed_at on a stateless runner",
+    )
     ap.add_argument("--upload", action="store_true", help="upload to R2 (needs R2_* env vars)")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if a.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if a.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
     out = Path(a.out)
     try:
         data = (fetch or (lambda: http_get(url(), timeout=90)))()
@@ -115,12 +128,17 @@ def main(argv=None, fetch=None, now=None) -> int:
     meta = build_meta(data, _read_prev(out, a.prev_url), now or now_iso())
     d = out / "satellite"
     atomic_write_bytes(d / IMAGE_NAME, data)
-    atomic_write_bytes(d / META_NAME, json.dumps(meta, separators=(",", ":")).encode())  # pointer LAST
+    atomic_write_bytes(
+        d / META_NAME, json.dumps(meta, separators=(",", ":")).encode()
+    )  # pointer LAST
     log.info("satellite: %.0f kB, changed_at %s", len(data) / 1e3, meta["changed_at"])
     if a.upload:
         from .upload import upload_files
 
-        log.info("uploaded %d objects", len(upload_files(out, [f"satellite/{IMAGE_NAME}", f"satellite/{META_NAME}"])))
+        log.info(
+            "uploaded %d objects",
+            len(upload_files(out, [f"satellite/{IMAGE_NAME}", f"satellite/{META_NAME}"])),
+        )
     return 0
 
 
