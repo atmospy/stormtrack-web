@@ -42,5 +42,5 @@ export async function computeIsobars(image: ImageBitmap, meta: ScalarFrameMeta):
   const m = await load();
   worker ??= m.createIsobarWorker();
   const copy = await createImageBitmap(image, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
-  return worker.isobars(copy, meta, { interval: 4, base: 1000 });
+  return worker.isobars(copy, meta, { interval: 4, base: 1000, upsample: 2, smooth: 1 });
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildIsobarSet, buildIsobars, splitAtAntimeridian, type DecodedScalar } from '../src/index.js';
+import { buildIsobarSet, buildIsobars, splitAtAntimeridian, upsampleScalar, type DecodedScalar } from '../src/index.js';
 
 type Fn = (lon: number, lat: number) => number;
 function field(f: Fn, w: number, h: number, lonL: number, lonR: number, latT: number, latB: number): DecodedScalar {
@@ -130,5 +130,58 @@ describe('splitAtAntimeridian', () => {
   });
   it('leaves seam-free lines alone', () => {
     expect(splitAtAntimeridian([[0, 0], [10, 10]])).toEqual([[[0, 0], [10, 10]]]);
+  });
+});
+
+describe('upsampleScalar', () => {
+  it('keeps the original samples exactly and reproduces a plane everywhere', () => {
+    const d = field((lon, lat) => 1000 + 2 * lon - 3 * lat, 21, 11, 0, 20, 10, 0);
+    const u = upsampleScalar(d, 4);
+    expect([u.width, u.height]).toEqual([81, 41]);
+    for (let j = 0; j < d.height; j++) for (let i = 0; i < d.width; i++) expect(u.values[j * 4 * u.width + i * 4]).toBeCloseTo(d.values[j * d.width + i]!, 4);
+    const lon = 7.25, lat = 3.5; // an interpolated node: cubic is exact for planes
+    expect(u.values[Math.round((10 - lat) / 0.25) * u.width + Math.round(lon / 0.25)]).toBeCloseTo(1000 + 2 * lon - 3 * lat, 3);
+  });
+
+  it('wraps on a global longitude grid (no seam) and keeps the layout', () => {
+    const d = field((lon) => 1000 + 10 * Math.cos((lon * Math.PI) / 180), 72, 37, -180, 175, 90, -90); // 5 deg, w*dx = 360
+    const u = upsampleScalar(d, 2);
+    expect([u.width, u.height]).toEqual([144, 73]);
+    expect(u.lon_right).toBeCloseTo(-180 + 143 * 2.5, 6);
+    // the interpolated column between the last sample (175) and the first (-180) must be a smooth cosine value at 177.5
+    const mid = u.values[u.width - 1]!; // lon = 177.5
+    expect(mid).toBeCloseTo(1000 + 10 * Math.cos((177.5 * Math.PI) / 180), 1);
+  });
+
+  it('makes contours of a coarse field smoother: closer to the true circle than the raw grid', () => {
+    const d = field((lon, lat) => 1000 + Math.hypot(lon - 10, lat - 5), 41, 41, 0, 20, 15, -5); // 0.5 deg grid
+    const err = (fc: ReturnType<typeof buildIsobars>) => {
+      const f = fc.features.find((x) => x.properties.value === 1006)!;
+      const c = parts(f)[0]!;
+      return Math.max(...c.map(([x, y]) => Math.abs(Math.hypot(x - 10, y - 5) - 6)));
+    };
+    const raw = err(buildIsobars(d, { interval: 2, base: 1000 }));
+    const up = err(buildIsobars(d, { interval: 2, base: 1000, upsample: 4 }));
+    expect(up).toBeLessThan(raw);
+    expect(up).toBeLessThan(0.02);
+  });
+});
+
+describe('smoothing a line that encircles the globe', () => {
+  it('does not draw a world-spanning chord (Chaikin across the longitude seam)', () => {
+    // pressure depends on latitude only, so every isobar is a full ring around the globe
+    const d = field((_lon, lat) => 1000 + (lat - 30) * 0.2, 144, 73, -180, 177.5, 90, -90);
+    for (const smooth of [0, 1, 2]) {
+      const fc = buildIsobars(d, { interval: 1, base: 1000, smooth });
+      expect(fc.features.length).toBeGreaterThan(5);
+      for (const f of fc.features) {
+        for (const part of parts(f)) {
+          for (let i = 1; i < part.length; i++) {
+            const dl = Math.abs(part[i]![0] - part[i - 1]![0]);
+            expect(Math.min(dl, 360 - dl)).toBeLessThan(5);
+          }
+        }
+      }
+    }
   });
 });

@@ -69,6 +69,12 @@ export interface IsobarOptions {
   base?: number;
   /** Chaikin corner-cutting iterations applied to every line (default 0; the 0.25 deg grid is already smooth) */
   smooth?: number;
+  /**
+   * Integer factor (default 1) by which the field is interpolated (Catmull-Rom cubic, longitude-periodic on global
+   * grids) before contouring, so lines follow the field's curvature instead of the data grid. 2 turns a 0.5 deg
+   * grid into 0.25 deg at 4x the work (about 140 ms in a worker); values above 4 are not useful.
+   */
+  upsample?: number;
   /** a line gets a "major" flag every `majorEvery` intervals (default 5) */
   majorEvery?: number;
   /** label spacing along a line, in degrees of arc (default 14) */

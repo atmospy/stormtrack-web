@@ -131,6 +131,12 @@ function chain(L: Level, w: number, periodic: boolean): Chain[] {
 
 function chaikin(pts: Pt[], closed: boolean, iters: number): Pt[] {
   let p = pts;
+  // A line that encircles the globe is "closed" on the sphere but its end points differ by a full grid width in
+  // x. Corner-cutting across that jump would draw a world-spanning chord, so treat it as an open line.
+  if (closed && pts.length > 1) {
+    const a = pts[0]!, b = pts[pts.length - 1]!;
+    if (Math.abs(a[0] - b[0]) > 1e-9 || Math.abs(a[1] - b[1]) > 1e-9) closed = false;
+  }
   for (let it = 0; it < iters; it++) {
     const n = closed ? p.length - 1 : p.length;
     if (n < 3) break;
@@ -266,11 +272,54 @@ function extrema(d: DecodedScalar, radiusDeg: number, minDelta: number): Array<{
   return found.map(({ type, value, lon, lat }) => ({ type, value, lon: wrap180(lon), lat }));
 }
 
+/** Catmull-Rom weights for the 4 taps around a point at fraction t in [0,1) between taps 1 and 2. */
+function cr(t: number): [number, number, number, number] {
+  const t2 = t * t, t3 = t2 * t;
+  return [(-t3 + 2 * t2 - t) / 2, (3 * t3 - 5 * t2 + 2) / 2, (-3 * t3 + 4 * t2 + t) / 2, (t3 - t2) / 2];
+}
+
+/**
+ * Interpolate a field to `n` times the resolution with a separable Catmull-Rom cubic. Global longitude grids wrap
+ * (the result keeps the "last column is one step before the first" layout); latitude rows clamp at the edges.
+ * Catmull-Rom passes through the original samples exactly, so the data are never altered, only filled in.
+ */
+export function upsampleScalar(d: DecodedScalar, n: number): DecodedScalar {
+  n = Math.floor(n);
+  if (!(n > 1)) return d;
+  const { width: w, height: h, values } = d;
+  const periodic = isGlobalLon(d);
+  const w2 = periodic ? w * n : (w - 1) * n + 1;
+  const h2 = (h - 1) * n + 1;
+  const xi = (i: number) => (periodic ? ((i % w) + w) % w : Math.min(Math.max(i, 0), w - 1));
+  const yi = (j: number) => Math.min(Math.max(j, 0), h - 1);
+  const wts = Array.from({ length: n }, (_, k) => cr(k / n));
+  // pass 1: along longitude, original rows -> w2 columns
+  const tmp = new Float32Array(w2 * h);
+  for (let j = 0; j < h; j++) {
+    const row = j * w;
+    for (let I = 0; I < w2; I++) {
+      const i = Math.floor(I / n), k = I - i * n, c = wts[k]!;
+      tmp[j * w2 + I] =
+        c[0] * values[row + xi(i - 1)]! + c[1] * values[row + xi(i)]! + c[2] * values[row + xi(i + 1)]! + c[3] * values[row + xi(i + 2)]!;
+    }
+  }
+  // pass 2: along latitude, h rows -> h2 rows
+  const out = new Float32Array(w2 * h2);
+  for (let J = 0; J < h2; J++) {
+    const j = Math.floor(J / n), k = J - j * n, c = wts[k]!;
+    const r0 = yi(j - 1) * w2, r1 = yi(j) * w2, r2 = yi(j + 1) * w2, r3 = yi(j + 2) * w2;
+    for (let I = 0; I < w2; I++) out[J * w2 + I] = c[0] * tmp[r0 + I]! + c[1] * tmp[r1 + I]! + c[2] * tmp[r2 + I]! + c[3] * tmp[r3 + I]!;
+  }
+  const dx = (d.lon_right - d.lon_left) / (w - 1);
+  return { ...d, width: w2, height: h2, values: out, lon_right: d.lon_left + (w2 - 1) * (dx / n) };
+}
+
 /**
  * Isobars (contour lines + label anchors + H/L centres) of a decoded field. Pure and synchronous: run it in a worker.
  * Lines use lon/lat in [-180,180]; features crossing the antimeridian are `MultiLineString`s split at +-180.
  */
 export function buildIsobarSet(d: DecodedScalar, opts: IsobarOptions = {}): IsobarResult {
+  if ((opts.upsample ?? 1) > 1) d = upsampleScalar(d, Math.min(Math.floor(opts.upsample!), 4));
   const interval = opts.interval ?? 4;
   const base = opts.base ?? 1000;
   const smooth = Math.max(0, Math.floor(opts.smooth ?? 0));
