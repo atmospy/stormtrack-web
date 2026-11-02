@@ -26,8 +26,8 @@ export function addStormLayers(map: Map_): void {
   map.addLayer({ id: 'st-history-glow', type: 'line', source: 'st-history', filter: noSel, layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': '#ffffff', 'line-opacity': 0.2, 'line-width': 9, 'line-blur': 6 } });
   map.addLayer({ id: 'st-history-hl', type: 'line', source: 'st-history', filter: noSel, layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': colorExpr, 'line-opacity': 1, 'line-width': 3 } });
 
-  map.addLayer({ id: 'st-cone-fill', type: 'fill', source: 'st-lines', filter: only('cone'), paint: { 'fill-color': '#9fd8ff', 'fill-opacity': 0.13 } });
-  map.addLayer({ id: 'st-cone-line', type: 'line', source: 'st-lines', filter: only('cone'), paint: { 'line-color': '#9fd8ff', 'line-opacity': 0.55, 'line-width': 1 } });
+  map.addLayer({ id: 'st-cone-fill', type: 'fill', source: 'st-lines', filter: only('cone'), paint: { 'fill-color': '#9fd8ff', 'fill-opacity': 0.24 } });
+  map.addLayer({ id: 'st-cone-line', type: 'line', source: 'st-lines', filter: only('cone'), paint: { 'line-color': '#c8e9ff', 'line-opacity': 0.9, 'line-width': 1.5 } });
   map.addLayer({ id: 'st-track', type: 'line', source: 'st-lines', filter: only('track'), layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#e8f3ff', 'line-opacity': 0.85, 'line-width': 2 } });
   map.addLayer({ id: 'st-track-pts', type: 'circle', source: 'st-pts', filter: only('trackpt'), paint: { 'circle-color': colorExpr, 'circle-radius': 3, 'circle-stroke-color': '#050914', 'circle-stroke-width': 1 } });
   map.addLayer({ id: 'st-forecast', type: 'line', source: 'st-lines', filter: only('forecast'), layout: { 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-opacity': 0.9, 'line-width': 2, 'line-dasharray': [1.6, 1.6] } });
