@@ -72,10 +72,12 @@ class Source(Protocol):
         ...
 
 
-SOURCE_IDS = ("goes-glm", "iitm-damini")
+SOURCE_IDS = ("goes-glm", "iitm-damini", "imd-lightning")
 
 
-def default_sources(names=("goes-glm",), glm: dict | None = None, iitm: dict | None = None):
+def default_sources(
+    names=("goes-glm",), glm: dict | None = None, iitm: dict | None = None, imd: dict | None = None
+):
     """Build the requested sources (order = ``src`` index order in flashes.json)."""
     out = []
     for n in names:
@@ -87,6 +89,10 @@ def default_sources(names=("goes-glm",), glm: dict | None = None, iitm: dict | N
             from .iitm_damini import IitmDamini
 
             out.append(IitmDamini(**(iitm or {})))
+        elif n == "imd-lightning":
+            from .imd_wfs import ImdLightning
+
+            out.append(ImdLightning(**(imd or {})))
         else:
             raise ValueError(f"unknown source {n!r}; choose from {', '.join(SOURCE_IDS)}")
     return out

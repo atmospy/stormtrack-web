@@ -347,9 +347,18 @@ def run(
     notes += " Coverage footprints are approximate (see coverage.geojson)."
     for s, _ in active:
         if s.unofficial:
+            if s.time_precision == "exact":
+                timing = (
+                    "strike times are exact, but the feed is published in batches about every "
+                    "15 minutes, so strikes arrive 5 to 35 minutes late, and no energy is reported."
+                )
+            else:
+                timing = (
+                    f"strike times are {s.time_uncertainty_s:g} s-uncertain age-bucket midpoints "
+                    "and no energy is reported."
+                )
             notes += (
-                f" {s.name} is an unofficial, undocumented feed with no published licence: "
-                f"strike times are {s.time_uncertainty_s:g} s-uncertain age-bucket midpoints and no energy is reported."
+                f" {s.name} is an unofficial, undocumented feed with no published licence: {timing}"
             )
     for s, _ in active:
         if s.high_volume and dec.get(s.id):
