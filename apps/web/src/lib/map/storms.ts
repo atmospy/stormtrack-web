@@ -5,7 +5,7 @@ import { positionAt } from '#lib/map/stormTime';
 import { categoryFromLabel, categoryFromWind, colorFor, CATEGORIES } from '#lib/util/storm';
 
 /** Layers a click can resolve to an active storm. */
-export const ACTIVE_HIT_LAYERS = ['st-core', 'st-glow', 'st-track', 'st-forecast', 'st-cone-fill'];
+export const ACTIVE_HIT_LAYERS = ['st-core', 'st-glow', 'st-fc-pts', 'st-track-pts', 'st-track', 'st-forecast', 'st-cone-fill'];
 export const HISTORY_LAYER = 'st-history';
 const ALL = [
   'st-history', 'st-history-glow', 'st-history-hl', 'st-cone-fill', 'st-cone-line', 'st-track', 'st-track-pts', 'st-forecast', 'st-fc-pts',
@@ -68,14 +68,14 @@ export function setActiveData(map: Map_, active: ActiveStorms, validMs: number |
     } else if (p.kind === 'track') {
       lines.push({ type: 'Feature', geometry: f.geometry as GeoJSON.LineString, properties: { kind: 'track', id: p.id } });
       (f.geometry as GeoJSON.LineString).coordinates.forEach((c, i) => {
-        pts.push({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: { kind: 'trackpt', id: p.id, color: categoryFromWind(p.wind_kt[i]).color } });
+        pts.push({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: { kind: 'trackpt', id: p.id, t: Date.parse(p.times[i]!), color: categoryFromWind(p.wind_kt[i]).color } });
       });
     } else if (p.kind === 'forecast') {
       // forecast has no id in the contract list; derive it from the nearest position by proximity of the first vertex
       const id = p.id ?? nearestStormId(active, (f.geometry as GeoJSON.LineString).coordinates[0]!);
       lines.push({ type: 'Feature', geometry: f.geometry as GeoJSON.LineString, properties: { kind: 'forecast', id } });
       (f.geometry as GeoJSON.LineString).coordinates.forEach((c, i) => {
-        pts.push({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: { kind: 'fcpt', id, tau: p.taus[i], color: colorFor(p.category[i], p.wind_kt[i]) } });
+        pts.push({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: { kind: 'fcpt', id, tau: p.taus[i], t: Date.parse(p.init) + (p.taus[i] ?? 0) * 3600e3, color: colorFor(p.category[i], p.wind_kt[i]) } });
       });
     } else {
       lines.push({ type: 'Feature', geometry: f.geometry as GeoJSON.Polygon, properties: { kind: 'cone', id: p.id } });

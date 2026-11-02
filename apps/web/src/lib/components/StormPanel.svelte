@@ -8,7 +8,7 @@
   import { historyVertices } from '#lib/data/contracts';
   import { groupStorms, stormBounds } from '#lib/data/active';
   import { ensureHistory, ensureStats } from '#lib/data/boot';
-  import { categoryFromLabel, compass, ktToKmh, fmtAgo } from '#lib/util/storm';
+  import { categoryFromLabel, categoryFromWind, compass, ktToKmh, fmtAgo } from '#lib/util/storm';
   import { history } from '#lib/history/state.svelte';
   import { seasonLabel } from '#lib/data/history';
 
@@ -31,6 +31,32 @@
     const t0 = Date.parse(f.init);
     return f.taus.map((tau, i) => ({ t: t0 + tau * 3600e3, w: f.wind_kt[i] ?? NaN })).filter((p) => p.w === p.w && p.t > t0);
   });
+  /** Every fix of an active storm, oldest first: observed track then forecast points. */
+  const fixes = $derived.by(() => {
+    if (!bundle) return [];
+    const out: { t: number; w: number | null; fc: boolean; tau?: number }[] = [];
+    const tr = bundle.track?.properties;
+    tr?.times.forEach((t, i) => out.push({ t: Date.parse(t), w: tr.wind_kt[i] ?? null, fc: false }));
+    const f = bundle.forecast?.properties;
+    if (f) {
+      const t0 = Date.parse(f.init);
+      f.taus.forEach((tau, i) => {
+        if (tau > 0 && f.wind_kt[i] !== undefined) out.push({ t: t0 + tau * 3600e3, w: f.wind_kt[i] ?? null, fc: true, tau });
+      });
+    }
+    return out.filter((x) => Number.isFinite(x.t)).sort((a, b) => a.t - b.t);
+  });
+  /** the fix nearest the slider time is the highlighted row */
+  const activeFix = $derived.by(() => {
+    if (app.validMs === null || !fixes.length) return -1;
+    let best = 0;
+    for (let i = 1; i < fixes.length; i++) if (Math.abs(fixes[i]!.t - app.validMs) < Math.abs(fixes[best]!.t - app.validMs)) best = i;
+    return best;
+  });
+  const fmtFix = (t: number) => new Date(t).toUTCString().slice(5, 22).replace(' GMT', '');
+  function goto(t: number) {
+    if (!app.scrubToMs(t)) toast.show('That time is outside the weather timeline', 'info');
+  }
   const annual = $derived(stats ? stats.annual.map((a) => ({ year: a.year, value: a.storms })) : []);
 
   $effect(() => {
@@ -113,6 +139,21 @@
           <Sparkline {observed} {forecast} />
         </div>
       {/if}
+      {#if fixes.length > 1}
+        <div class="sec">
+          <div class="label">Track fixes <span class="leg">UTC · click to jump</span></div>
+          <div class="fixes tnum" role="list">
+            {#each fixes as x, i (i)}
+              {@const c = categoryFromWind(x.w)}
+              <button class="fx" class:on={i === activeFix} class:fc={x.fc} role="listitem" onclick={() => goto(x.t)} title={x.fc ? `Forecast +${x.tau} h` : 'Observed fix'}>
+                <span class="d">{fmtFix(x.t)}</span>
+                <span class="k" style="background:{c.color}">{x.fc ? 'F' : 'O'}</span>
+                <span class="w">{x.w ?? '–'} kt</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
       {#if bundle?.cone}<p class="small">Cone: {bundle.cone.properties.basis || 'uncertainty cone'}</p>{/if}
 
       <div class="sec">
@@ -161,6 +202,13 @@
   .leg { float: right; text-transform: none; letter-spacing: 0; font-weight: 400; }
   .leg i { display: inline-block; width: 12px; height: 0; border-top: 2px solid var(--accent); margin: 0 4px 3px 8px; }
   .leg i.f { border-top: 2px dashed #fff; }
+  .fixes { max-height: 190px; overflow-y: auto; scrollbar-width: thin; border: 1px solid var(--line); border-radius: 9px; }
+  .fx { display: grid; grid-template-columns: 1fr 22px 58px; gap: 8px; align-items: center; width: 100%; padding: 5px 10px; border: 0; background: none; color: var(--text-dim); font-size: 12px; text-align: left; cursor: pointer; }
+  .fx:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+  .fx.on { background: rgba(94, 224, 255, 0.16); color: var(--text); }
+  .fx.fc .d { font-style: italic; }
+  .fx .k { display: inline-block; text-align: center; border-radius: 4px; color: #050914; font-weight: 700; font-size: 10.5px; line-height: 16px; }
+  .fx .w { text-align: right; }
   .acts { display: flex; gap: 8px; margin-top: 16px; }
   .links { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 12px; }
   @media (max-width: 900px) {
