@@ -26,7 +26,7 @@
   });
 
   const close = () => (app.paletteOpen = false);
-  const layerNames: [LayerKey, string][] = [['wind', 'weather layer'], ['storms', 'active cyclones'], ['history', 'storm history'], ['events', 'natural events'], ['quakes', 'earthquakes'], ['fires', 'fire hotspots'], ['lightning', 'lightning'], ['nowcast', 'India warnings'], ['satellite', 'satellite infrared']];
+  const layerNames: [LayerKey, string][] = [['wind', 'weather layer'], ['storms', 'active cyclones'], ['history', 'storm history'], ['events', 'natural events'], ['quakes', 'earthquakes'], ['fires', 'fire hotspots'], ['lightning', 'lightning'], ['nowcast', 'India warnings'], ['satellite', 'satellite infrared'], ['clouds', 'cloud imagery']];
 
   const base = $derived.by<Item[]>(() => {
     const items: Item[] = [];

@@ -4,7 +4,7 @@ import { levelKey, nearestIndex, primaryField, timeline, variablesOf, windFieldA
 import type { WindSample } from '#lib/weather/sample';
 import { gate } from './gate.svelte';
 
-export type LayerKey = 'wind' | 'storms' | 'history' | 'events' | 'quakes' | 'fires' | 'lightning' | 'nowcast' | 'satellite';
+export type LayerKey = 'wind' | 'storms' | 'history' | 'events' | 'quakes' | 'fires' | 'lightning' | 'nowcast' | 'satellite' | 'clouds';
 export type Availability = 'loading' | 'ready' | 'missing' | 'error';
 export interface Selection {
   type: 'active' | 'history';
@@ -28,8 +28,8 @@ class AppState {
   /** wind rendering: animated particles or static arrow field */
   windMode = $state<'particles' | 'arrows'>('particles');
 
-  layers = $state<Record<LayerKey, boolean>>({ wind: true, storms: true, history: false, events: true, quakes: true, fires: false, lightning: false, nowcast: false, satellite: false });
-  availability = $state<Record<LayerKey, Availability>>({ wind: 'loading', storms: 'loading', history: 'loading', events: 'loading', quakes: 'loading', fires: 'loading', lightning: 'ready', nowcast: 'loading', satellite: 'loading' });
+  layers = $state<Record<LayerKey, boolean>>({ wind: true, storms: true, history: false, events: true, quakes: true, fires: false, lightning: false, nowcast: false, satellite: false, clouds: false });
+  availability = $state<Record<LayerKey, Availability>>({ wind: 'loading', storms: 'loading', history: 'loading', events: 'loading', quakes: 'loading', fires: 'loading', lightning: 'ready', nowcast: 'loading', satellite: 'loading', clouds: 'ready' });
   notes = $state<Partial<Record<LayerKey, string>>>({});
 
   // ---- weather catalogue (CONTRACTS 1b, with legacy section 1 fallback) ----
