@@ -17,7 +17,7 @@ _LOCK = threading.Lock()
 
 # Minimum seconds between requests per host substring. ECMWF's S3 answers 503 SlowDown in bursts
 # (even to HEAD/index requests), so we pace it; NOAA's bucket copes with full parallelism.
-PACE = {"ecmwf-forecasts": 0.3}
+PACE = {"ecmwf-forecasts": 0.3, "data.ecmwf.int": 0.2, "ecmwf-open-data": 0.2}
 _NEXT = {}
 
 
@@ -61,7 +61,7 @@ def _retry(fn, tries=20, base=1.0):
             time.sleep(wait)
 
 
-def get(url: str, byte_range=None, timeout: float = 60) -> bytes:
+def get(url: str, byte_range=None, timeout: float = 60, tries: int = 20) -> bytes:
     """GET (optionally `bytes=a-b` inclusive; b may be None for open-ended)."""
 
     def go():
@@ -81,7 +81,7 @@ def get(url: str, byte_range=None, timeout: float = 60) -> bytes:
             STATS["requests"] += 1
         return data
 
-    return _retry(go)
+    return _retry(go, tries=tries)
 
 
 def head(url: str, timeout: float = 20) -> bool:

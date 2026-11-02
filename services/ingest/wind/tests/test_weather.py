@@ -280,3 +280,57 @@ def test_real_ecmwf_layout_and_gfs_fields(tmp_path):
         got = m.fetch(run, 6, [fields.BY_SLUG[s] for s in ("mslp", "wind_250", "precip")])
         assert 940 < got["mslp"].u.mean() < 1030 and got["precip"].u.min() >= 0
         assert gfs.run_id(run)
+
+
+def test_ecmwf_base_prefers_first_working_mirror(monkeypatch):
+    run = dt.datetime(2026, 11, 2, 0)
+    monkeypatch.delenv("ECMWF_BASE", raising=False)
+    models._BASE_CHOSEN.clear()
+    seen = []
+
+    def fake_get(url, byte_range=None, timeout=60, tries=20):
+        seen.append(url)
+        if "data.ecmwf.int" in url:
+            raise IOError("HTTP Error 503")
+        return b"x" * 256
+
+    monkeypatch.setattr(models.http, "get", fake_get)
+    base = models.ecmwf_base(run, "ifs/0p25/oper")
+    assert base == "https://storage.googleapis.com/ecmwf-open-data"  # ECMWF failed, Google answered
+    assert len(seen) == 2
+    models.ecmwf_base(run, "ifs/0p25/oper")  # decided once per run
+    assert len(seen) == 2
+    models._BASE_CHOSEN.clear()
+
+
+def test_ecmwf_base_env_override_and_all_failing(monkeypatch):
+    run = dt.datetime(2026, 11, 2, 0)
+    models._BASE_CHOSEN.clear()
+    monkeypatch.setenv("ECMWF_BASE", "https://example.test/x/")
+    assert models.ecmwf_base(run, "ifs/0p25/oper") == "https://example.test/x"
+    monkeypatch.delenv("ECMWF_BASE")
+
+    def boom(url, byte_range=None, timeout=60, tries=20):
+        raise IOError("down")
+
+    monkeypatch.setattr(models.http, "get", boom)
+    assert (
+        models.ecmwf_base(run, "ifs/0p25/oper") == models.ECMWF_BASES[0]
+    )  # nothing answered: first, retries report
+    models._BASE_CHOSEN.clear()
+
+
+def test_ecmwf_base_not_published_yet_is_not_cached(monkeypatch):
+    run = dt.datetime(2026, 11, 2, 12)
+    models._BASE_CHOSEN.clear()
+    monkeypatch.delenv("ECMWF_BASE", raising=False)
+    calls = []
+
+    def missing(url, byte_range=None, timeout=60, tries=20):
+        calls.append(url)
+        raise models.http.NotFound(url)
+
+    monkeypatch.setattr(models.http, "get", missing)
+    assert models.ecmwf_base(run, "ifs/0p25/oper") == models.ECMWF_BASES[0]
+    assert len(calls) == 1  # one 404 is enough: no point trying the other mirrors
+    assert (run, "ifs/0p25/oper") not in models._BASE_CHOSEN
