@@ -1,0 +1,38 @@
+name: ECMWF probe (manual)
+
+# One-off check: can the weather ingest download ECMWF IFS/AIFS from a GitHub-hosted runner?
+# (From a home network ECMWF's open-data bucket answered 503 SlowDown to data requests.)
+# Manual only, no secrets, nothing is uploaded; it only reports what was produced.
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: "Models to try"
+        default: "ecmwf-ifs,ecmwf-aifs"
+      hours:
+        description: "Last forecast hour"
+        default: "12"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/ingest/wind/uv.lock
+      - name: Run the ingest into a scratch directory
+        working-directory: services/ingest/wind
+        run: |
+          uv sync
+          uv run ingest-wind --models "${{ inputs.models }}" --hours "${{ inputs.hours }}" --step 3 --out "$RUNNER_TEMP/probe" -v
+      - name: What was produced
+        if: always()
+        run: |
+          find "$RUNNER_TEMP/probe" -name latest.json -o -name index.json | sort
+          du -sh "$RUNNER_TEMP/probe" || true
