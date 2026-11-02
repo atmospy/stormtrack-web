@@ -20,7 +20,7 @@
     { key: 'fires', label: 'Fire hotspots', icon: 'fire', hint: 'NASA FIRMS', key_: 'F' },
     { key: 'satellite', label: 'Satellite', icon: 'cloud', hint: 'INSAT infrared, IMD', key_: 'I' },
     { key: 'nowcast', label: 'India warnings', icon: 'event', hint: 'IMD district nowcast, ~3 h', key_: 'N' },
-    { key: 'lightning', label: 'Lightning', icon: 'bolt', hint: 'GOES GLM · Americas', key_: 'G' }
+    { key: 'lightning', label: 'Lightning', icon: 'bolt', hint: 'GOES GLM Americas · IMD India', key_: 'G' }
   ];
   function count(k: LayerKey): string {
     if (k === 'storms') return app.active ? String(app.active.features.filter((f) => f.properties.kind === 'position').length) : '';

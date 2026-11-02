@@ -8,7 +8,7 @@ import type { LightningGLLayer } from './layer';
 import type { LiveController } from './live';
 import type { ThunderEngine } from './audio';
 
-export const OUTSIDE_NOTICE = 'No open real-time lightning feed covers this region yet. GOES GLM covers the Americas, Atlantic and east Pacific.';
+export const OUTSIDE_NOTICE = 'No real-time lightning feed covers this region yet. We show GOES GLM (the Americas, Atlantic and east Pacific) and IMD (India and nearby seas, about 5 to 35 minutes behind).';
 const REFRESH_MS = 60_000;
 /** the 2-3 MB flashes.json is only reloaded this often; between those the cheap index.json is enough */
 const FULL_RELOAD_MS = 5 * 60_000;
