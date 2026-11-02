@@ -84,6 +84,21 @@ class AuthStore {
     }
   }
 
+  /** Finish a sign-in that started with Google's own button: the ID token and the raw nonce behind its hash. */
+  async signInWithGoogleCredential(token: string, nonce: string): Promise<AuthResult> {
+    if (!this.configured) return DEMO;
+    this.busy = true;
+    try {
+      const sb = await getSupabase();
+      const { error } = await sb.auth.signInWithIdToken({ provider: 'google', token, nonce });
+      return error ? { ok: false, reason: 'error', message: error.message } : { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'error', message: (e as Error).message };
+    } finally {
+      this.busy = false;
+    }
+  }
+
   signInWithGoogle(): Promise<AuthResult> {
     return this.signInWithProvider('google');
   }

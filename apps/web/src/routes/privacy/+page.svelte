@@ -40,7 +40,7 @@
   <ul>
     <li><b>Supabase</b> runs sign-in and stores account data.</li>
     <li><b>Resend</b> sends the sign-in emails.</li>
-    <li><b>Google</b> and <b>GitHub</b> handle sign-in if you choose them. They tell us your email, name and picture, and we tell them nothing else.</li>
+    <li><b>Google</b> and <b>GitHub</b> handle sign-in if you choose them. They tell us your email, name and picture, and we tell them nothing else. When the sign-in window is open, your browser loads Google's sign-in button script from Google, so Google sees that request and your IP address.</li>
     <li><b>Cloudflare</b> hosts the site and delivers its data files. Like any host, it sees your IP address and which files you request.</li>
     <li><b>OpenFreeMap</b> supplies the basemap tiles. Your browser requests them directly, so it sees your IP address and roughly which area you are viewing.</li>
     <li><b>OpenStreetMap (Nominatim)</b> receives what you type in place search, and your IP address, when you search.</li>

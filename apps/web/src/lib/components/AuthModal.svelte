@@ -2,6 +2,7 @@
   import Icon from './Icon.svelte';
   import { app } from '#lib/stores/app.svelte';
   import { auth } from '#lib/auth/auth.svelte';
+  import { googleNativeAvailable, mountGoogleButton } from '#lib/auth/google';
 
   let email = $state('');
   let sent = $state(false);
@@ -9,6 +10,21 @@
   let providers = $state<Set<string> | null>(null);
   $effect(() => { auth.enabledProviders().then((p) => (providers = p)); });
   const on = (id: string) => providers === null || providers.has(id);
+
+  // Google's own button when it can be loaded; the redirect button below stays as the fallback
+  let gEl = $state<HTMLElement | null>(null);
+  let gNative = $state(false);
+  $effect(() => {
+    if (!gEl || !googleNativeAvailable() || !auth.configured || !on('google')) return;
+    mountGoogleButton(gEl, async (credential, nonce) => {
+      err = '';
+      const r = await auth.signInWithGoogleCredential(credential, nonce);
+      if (r.ok) close();
+      else err = r.message;
+    })
+      .then(() => (gNative = true))
+      .catch(() => (gNative = false));
+  });
   const close = () => (app.authOpen = false);
 
   async function magic(e: SubmitEvent) {
@@ -50,7 +66,8 @@
     {#if sent}
       <div class="ok" role="status">Check <b>{email}</b> for a sign-in link. You can close this window.</div>
     {:else}
-      {#if on('google')}<button class="btn g" onclick={google} disabled={!auth.configured || auth.busy}>
+      {#if on('google') && googleNativeAvailable() && auth.configured}<div class="gbtn" bind:this={gEl} hidden={!gNative}></div>{/if}
+      {#if on('google') && !gNative}<button class="btn g" onclick={google} disabled={!auth.configured || auth.busy}>
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.5 12.2c0-.8-.1-1.5-.2-2.2H12v4.2h5.9a5 5 0 0 1-2.2 3.3v2.7h3.5c2.1-1.9 3.3-4.7 3.3-8z"/><path fill="#34A853" d="M12 23c3 0 5.4-1 7.2-2.7l-3.5-2.7c-1 .7-2.2 1-3.7 1-2.8 0-5.2-1.9-6-4.5H2.4v2.8A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M6 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.4a11 11 0 0 0 0 9.8z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3 .6 4.1 1.600l3.100-3.100A11 11 0 0 0 2.400 7.100L6 9.900c.8-2.600 3.200-4.500 6-4.500z"/></svg>
         Continue with Google
       </button>{/if}
@@ -91,4 +108,6 @@
   .err { color: var(--danger); font-size: 13px; margin: 10px 0 0; }
   .fine { font-size: 11px; color: var(--text-faint); margin: 16px 0 0; }
   .fine a { color: var(--text-dim); }
+  .gbtn { display: flex; justify-content: center; min-height: 40px; }
+  .gbtn[hidden] { display: none; }
 </style>
