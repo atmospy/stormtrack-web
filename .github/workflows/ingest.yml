@@ -34,6 +34,10 @@ on:
         type: choice
         default: all
         options: [all, wind, storms, hazards, lightning, history]
+      models:
+        description: "Wind models for a manual run: comma list of gfs, ecmwf-ifs, ecmwf-aifs (scheduled runs use gfs)"
+        type: string
+        default: gfs
 
 permissions:
   contents: read
@@ -53,7 +57,7 @@ jobs:
       ((github.event_name == 'schedule' && github.event.schedule == '35 1-23/3 * * *') ||
        (github.event_name == 'workflow_dispatch' && contains(fromJSON('["all","wind"]'), inputs.only)))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45 # GFS alone takes ~7 min; ECMWF IFS and AIFS add ~7 min each
     concurrency:
       group: ingest-wind
       cancel-in-progress: false
@@ -69,9 +73,11 @@ jobs:
       - name: Ingest wind and upload to R2
         if: steps.detect.outputs.present == 'true'
         working-directory: services/ingest/wind
+        env:
+          MODELS: ${{ inputs.models || 'gfs' }} # passed through env, not interpolated into the script
         run: |
           uv sync
-          uv run ingest-wind --out "$RUNNER_TEMP/wind" --upload
+          uv run ingest-wind --models "$MODELS" --out "$RUNNER_TEMP/wind" --upload
 
   storms:
     name: Storms (active, NHC/JTWC)
