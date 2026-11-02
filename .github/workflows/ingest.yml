@@ -114,7 +114,7 @@ jobs:
           uv run ingest-storms --only active --out "$RUNNER_TEMP/storms" ${PUBLIC_DATA_BASE:+--prev-url "$PUBLIC_DATA_BASE"} --upload
 
   hazards:
-    name: Hazards (EONET, USGS, FIRMS)
+    name: Hazards (EONET, USGS, FIRMS, IMD nowcast)
     if: >-
       vars.INGEST_ENABLED != 'false' &&
       ((github.event_name == 'schedule' && github.event.schedule == '13,33,53 * * * *') ||
@@ -141,6 +141,12 @@ jobs:
         run: |
           uv sync
           uv run ingest-hazards --out "$RUNNER_TEMP/hazards" --upload
+      - name: Ingest India district nowcast warnings (IMD) and upload to R2
+        # separate from the hazards step so IMD being unreachable never fails the quake and event layers
+        if: steps.detect.outputs.present == 'true'
+        continue-on-error: true
+        working-directory: services/ingest/hazards
+        run: uv run ingest-nowcast --out "$RUNNER_TEMP/hazards" --upload
 
   lightning:
     name: Lightning (GOES GLM)
