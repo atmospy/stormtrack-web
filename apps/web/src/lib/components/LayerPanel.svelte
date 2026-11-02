@@ -10,7 +10,7 @@
 
   let open = $state(typeof matchMedia === 'undefined' || !matchMedia('(max-width: 720px)').matches);
 
-  type Row = { key: LayerKey; label: string; icon: 'wind' | 'storm' | 'history' | 'fire' | 'quake' | 'event' | 'bolt' | 'cloud'; hint: string; key_: string };
+  type Row = { key: LayerKey; label: string; icon: 'wind' | 'storm' | 'history' | 'fire' | 'quake' | 'event' | 'bolt' | 'cloud'; hint: string; key_: string; group?: string };
   const rows: Row[] = [
     { key: 'wind', label: 'Weather', icon: 'wind', hint: 'wind, pressure, temperature, rain', key_: 'W' },
     { key: 'storms', label: 'Active cyclones', icon: 'storm', hint: '', key_: 'S' },
@@ -18,9 +18,9 @@
     { key: 'events', label: 'Natural events', icon: 'event', hint: 'NASA EONET', key_: 'E' },
     { key: 'quakes', label: 'Earthquakes', icon: 'quake', hint: 'USGS 24 h', key_: 'Q' },
     { key: 'fires', label: 'Fire hotspots', icon: 'fire', hint: 'NASA FIRMS', key_: 'F' },
-    { key: 'satellite', label: 'Satellite', icon: 'cloud', hint: 'INSAT infrared, IMD', key_: 'I' },
-    { key: 'nowcast', label: 'India warnings', icon: 'event', hint: 'IMD district nowcast, ~3 h', key_: 'N' },
-    { key: 'lightning', label: 'Lightning', icon: 'bolt', hint: 'GOES GLM Americas · IMD India', key_: 'G' }
+    { key: 'lightning', label: 'Lightning', icon: 'bolt', hint: 'GOES GLM Americas · IMD India', key_: 'G' },
+    { key: 'satellite', label: 'Satellite', icon: 'cloud', hint: 'INSAT infrared', key_: 'I', group: 'India · IMD' },
+    { key: 'nowcast', label: 'District warnings', icon: 'event', hint: 'nowcast, valid ~3 h', key_: 'N', group: 'India · IMD' }
   ];
   function count(k: LayerKey): string {
     if (k === 'storms') return app.active ? String(app.active.features.filter((f) => f.properties.kind === 'position').length) : '';
@@ -47,7 +47,8 @@
   </button>
   {#if open}
     <ul>
-      {#each rows as r (r.key)}
+      {#each rows as r, i (r.key)}
+        {#if r.group && rows[i - 1]?.group !== r.group}<li class="grp" role="presentation">{r.group}</li>{/if}
         {@const a = app.availability[r.key]}
         {@const off = a === 'missing' || a === 'error'}
         <li>
@@ -92,6 +93,7 @@
   .chev { margin-left: auto; transition: transform 0.2s; transform: rotate(-90deg); display: grid; }
   .chev.open { transform: none; }
   ul { list-style: none; margin: 0; padding: 2px 6px 6px; }
+  .grp { margin: 8px 8px 2px; padding-top: 7px; border-top: 1px solid var(--line); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
   label { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; cursor: pointer; position: relative; }
   label:hover { background: rgba(255, 255, 255, 0.045); }
   label.off { opacity: 0.45; cursor: not-allowed; }
