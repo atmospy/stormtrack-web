@@ -1,7 +1,6 @@
 """India district nowcast warnings from IMD's public map service (UNDOCUMENTED) -> ``nowcast/latest.geojson``.
 
-The Mausam app draws its nowcast layer from ``imd_ws:nc_district`` on IMD's GeoServer. Read as WFS
-GeoJSON it holds one MultiPolygon per district (747, IMD's own boundaries) with::
+IMD's public GeoServer serves the ``imd_ws:nc_district`` layer. Read as WFS GeoJSON it holds one MultiPolygon per district (747, IMD's own boundaries) with::
 
     State_District   "BARAGARH"
     Date             "2026-11-02"            issue date (Indian time)
@@ -14,8 +13,8 @@ published, with the shapes rounded to 3 decimals (~100 m) and simplified (0.01 d
 turns a 4.4 MB response into a small file. Levels follow IMD's colours: amber 1, orange 2 and any
 other non-green colour 3; the words come from IMD's own texts.
 
-No terms of use are published for this service; it is the data source of IMD's own app, read here
-once per run from a descriptive User-Agent (never by visitors' browsers), and the output credits IMD.
+IMD publishes no terms for this service. It is read here once per run from a descriptive User-Agent (never by
+visitors' browsers), and the output credits IMD.
 A failed or unrecognisable response leaves the previous published file untouched.
 """
 
@@ -44,8 +43,7 @@ ROUND_DP = 3
 SIMPLIFY_DEG = 0.01
 STALE_AFTER_H = 12
 LICENCE = (
-    "No published licence or terms for this service; used as the data source of IMD's own app, "
-    "fetched server-side on a schedule; credit IMD. Written permission has not been requested."
+    "IMD publishes no licence or terms for this service; credit the India Meteorological Department"
 )
 ATTRIBUTION = "Nowcast warnings: India Meteorological Department (IMD)"
 
