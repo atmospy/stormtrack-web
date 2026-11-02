@@ -6,6 +6,10 @@
 
   const wins = [5, 15, 60] as const;
   const b = $derived(lightning.bundle);
+  const rateLine = $derived(
+    b ? b.index.sources.map((x, i) => ({ n: lightning.rates[i] ?? 0, id: x.id, name: x.id === 'demo-goes' ? 'Demo GOES-like' : x.id === 'demo-iitm' ? 'Demo IITM-like' : x.name.startsWith('NOAA') ? 'GOES' : x.name.includes('IITM') ? 'IITM' : x.name.split(' ')[0]! })).filter((x) => x.n > 0 || b.index.sources.length < 3).map((x) => `${x.name}: ${x.n} /min`).join(' · ') : ''
+  );
+  const noLive = $derived(lightning.feed.kind === 'missing' || lightning.feed.kind === 'offline');
   const fmt = (n: number) => n.toLocaleString('en-US');
   const updatedAgo = $derived(b ? fmtAgo(b.index.updated, lightning.nowMs) : '');
 </script>
@@ -16,16 +20,22 @@
   {:else if lightning.availability !== 'ready' || !b}
     <div class="n">Lightning feed unavailable right now.</div>
   {:else}
-    <div class="big tnum" role="status" aria-live="polite"><b>{fmt(lightning.count10)}</b> flashes in the last 10 min</div>
+    {#if b.demo}<div class="big tnum"><b>{fmt(lightning.rates.reduce((a, x) => a + x, 0))}</b> simulated strikes in the last minute</div>{:else}<div class="big tnum"><b>{fmt(lightning.count10)}</b> flashes in the last 10 min</div>{/if}
+    <div class="live tnum" aria-label="Live strikes per minute">{rateLine || 'no strikes played in the last minute'} <span class="n">(played, after the {Math.round(lightning.delayS)} s delay)</span></div>
+    <div class="row">
+      <button class="chip" class:on={lightning.demoActive} aria-pressed={lightning.demoActive} onclick={() => lightning.setDemo(!lightning.demoActive)} title="Plays a simulated storm feed through the same pipeline, to try animation and sound offline">{lightning.demoActive ? 'Stop demo' : 'Demo mode'}</button>
+      <label class="chk"><input type="checkbox" checked={lightning.reduceFlashing} onchange={(e) => (lightning.reduceFlashing = e.currentTarget.checked)} /> Reduce flashing{#if app.reducedMotion} <span class="n">(on: system setting)</span>{/if}</label>
+    </div>
+    {#if lightning.demoActive}<div class="notice" role="note">DEMO: all strikes are simulated, not real lightning.</div>{:else if noLive}<div class="notice" role="note">No live feed here ({lightning.feedNote || lightning.feed.kind}). <button class="lnk" onclick={() => lightning.setDemo(true)}>Try the demo</button></div>{/if}
     <div class="seg" role="group" aria-label="Lightning time window">
       {#each wins as w (w)}
         <button class:on={lightning.window === w} aria-pressed={lightning.window === w} onclick={() => { lightning.window = w; lightning.tick(); gate.interact(); }}>{w} min</button>
       {/each}
     </div>
-    <div class="age tnum">
+    {#if !b.demo}<div class="age tnum">
       Showing {fmt(lightning.countWindow)} in the last {lightning.window} min · data {updatedAgo}
       {#if lightning.stale}<span class="stale" title="The producer could not fetch new data and kept the previous files">STALE</span>{/if}
-    </div>
+    </div>{/if}
     {#if b.index.keepFraction < 1}<div class="n" title="The feed was capped at 100 000 flashes by keeping a uniform pseudo-random subset">Sampled: about {Math.round(b.index.keepFraction * 100)}% of detected flashes are shown (counts are of the sample).</div>{/if}
     {#if b.warnings.length}<div class="warn">{b.warnings.join('; ')}</div>{/if}
     {#if (lightning.ageMin ?? 0) > 30 && !b.sample}<div class="notice" role="note">The feed was last updated {updatedAgo}. Flashes older than the selected window are not drawn, so an old feed shows none.</div>{/if}
@@ -63,4 +73,10 @@
   .src b { color: var(--text); font-weight: 600; }
   .unof { color: var(--warn); border: 1px solid rgba(255, 176, 59, 0.45); border-radius: 6px; padding: 0 5px; font-size: 10.5px; margin-left: 2px; }
   .src .tnum { margin-left: 6px; }
+  .live { font-size: 12.5px; color: var(--text); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.05); color: var(--text-dim); border-radius: 8px; padding: 4px 10px; font-size: 12px; }
+  .chip.on { background: rgba(196, 181, 255, 0.18); color: var(--text); border-color: #c4b5ff; }
+  .chip:focus-visible, .chk input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .chk { font-size: 12px; color: var(--text-dim); display: flex; gap: 5px; align-items: center; }
 </style>

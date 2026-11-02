@@ -148,6 +148,19 @@ export interface LightningBundle {
   sample: boolean;
   /** problems that did not stop the layer (missing coverage, etc.) */
   warnings: string[];
+  /** true for the simulated demo feed (never real data) */
+  demo?: boolean;
+}
+
+/** Just index.json from a base (cheap; used by the live refresh between full reloads). Null on any failure. */
+export async function loadLightningIndexOnly(base: string, signal?: AbortSignal): Promise<LightningIndex | null> {
+  const raw = await getJson(`${base}/lightning/index.json`, signal);
+  if (raw === null) return null;
+  try {
+    return parseLightningIndex(raw);
+  } catch {
+    return null;
+  }
 }
 /** Index first (it is the pointer), then flashes + coverage; each failure degrades only its own part. */
 export async function loadLightning(signal?: AbortSignal): Promise<{ ok: true; value: LightningBundle } | { ok: false; error: string; missing: boolean }> {

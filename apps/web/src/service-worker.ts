@@ -18,6 +18,7 @@ const DATA = 'stormtrack-data-v1';
 const MAX_DATA_ENTRIES = 600; // ~0.5 MB each at 0.5 deg: bounded to a few hundred MB worst case, usually far less
 
 const RUN_STAMPED_FRAME = /\/\d{8}T\d{2}\/.+\.png$/;
+const LIVE = /\/lightning\/(recent|index)\.json$/;
 const POINTER = /\.(json|geojson)$/;
 
 self.addEventListener('install', () => {
@@ -52,6 +53,17 @@ async function cacheFirst(req: Request, name: string, limit: boolean): Promise<R
   return res;
 }
 
+/** Live files: network first; the cache is only an offline fallback. NEVER served ahead of the network. */
+async function networkFirst(event: FetchEvent): Promise<Response> {
+  try {
+    return await fetch(event.request, { cache: 'no-store' });
+  } catch (e) {
+    const hit = await (await caches.open(DATA)).match(event.request);
+    if (hit) return hit;
+    throw e;
+  }
+}
+
 async function staleWhileRevalidate(event: FetchEvent): Promise<Response> {
   const cache = await caches.open(DATA);
   const hit = await cache.match(event.request);
@@ -78,6 +90,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirst(req, APP, false));
   } else if (RUN_STAMPED_FRAME.test(url.pathname)) {
     event.respondWith(cacheFirst(req, DATA, true));
+  } else if (LIVE.test(url.pathname)) {
+    event.respondWith(networkFirst(event)); // recent.json / lightning index: never cache-first, never stale
   } else if (POINTER.test(url.pathname) && /\/(data|weather|wind|storms|hazards|lightning)\//.test(url.pathname)) {
     event.respondWith(staleWhileRevalidate(event));
   }

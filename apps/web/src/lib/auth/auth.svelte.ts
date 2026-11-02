@@ -70,17 +70,35 @@ class AuthStore {
     }
   }
 
-  async signInWithGoogle(): Promise<AuthResult> {
+  async signInWithProvider(provider: 'google' | 'github'): Promise<AuthResult> {
     if (!this.configured) return DEMO;
     this.busy = true;
     try {
       const sb = await getSupabase();
-      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
+      const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin + location.pathname } });
       return error ? { ok: false, reason: 'error', message: error.message } : { ok: true };
     } catch (e) {
       return { ok: false, reason: 'error', message: (e as Error).message };
     } finally {
       this.busy = false;
+    }
+  }
+
+  signInWithGoogle(): Promise<AuthResult> {
+    return this.signInWithProvider('google');
+  }
+
+  /** Which OAuth providers the Supabase project has switched on (public settings endpoint). */
+  async enabledProviders(): Promise<Set<string> | null> {
+    if (!this.configured) return null;
+    try {
+      const base = (import.meta.env.PUBLIC_SUPABASE_URL as string).replace(/\/$/, '');
+      const r = await fetch(`${base}/auth/v1/settings`, { headers: { apikey: import.meta.env.PUBLIC_SUPABASE_ANON_KEY as string } });
+      if (!r.ok) return null;
+      const ext = (await r.json()).external ?? {};
+      return new Set(Object.keys(ext).filter((k) => ext[k]));
+    } catch {
+      return null; // unknown: show every button rather than hide a working one
     }
   }
 

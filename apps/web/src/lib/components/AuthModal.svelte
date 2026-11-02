@@ -6,6 +6,9 @@
   let email = $state('');
   let sent = $state(false);
   let err = $state('');
+  let providers = $state<Set<string> | null>(null);
+  $effect(() => { auth.enabledProviders().then((p) => (providers = p)); });
+  const on = (id: string) => providers === null || providers.has(id);
   const close = () => (app.authOpen = false);
 
   async function magic(e: SubmitEvent) {
@@ -18,6 +21,11 @@
   async function google() {
     err = '';
     const r = await auth.signInWithGoogle();
+    if (!r.ok) err = r.message;
+  }
+  async function github() {
+    err = '';
+    const r = await auth.signInWithProvider('github');
     if (!r.ok) err = r.message;
   }
   function key(e: KeyboardEvent) {
@@ -42,11 +50,15 @@
     {#if sent}
       <div class="ok" role="status">Check <b>{email}</b> for a sign-in link. You can close this window.</div>
     {:else}
-      <button class="btn g" onclick={google} disabled={!auth.configured || auth.busy}>
+      {#if on('google')}<button class="btn g" onclick={google} disabled={!auth.configured || auth.busy}>
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.5 12.2c0-.8-.1-1.5-.2-2.2H12v4.2h5.9a5 5 0 0 1-2.2 3.3v2.7h3.5c2.1-1.9 3.3-4.7 3.3-8z"/><path fill="#34A853" d="M12 23c3 0 5.4-1 7.2-2.7l-3.5-2.7c-1 .7-2.2 1-3.7 1-2.8 0-5.2-1.9-6-4.5H2.4v2.8A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M6 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.4a11 11 0 0 0 0 9.8z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3 .6 4.1 1.600l3.100-3.100A11 11 0 0 0 2.400 7.100L6 9.900c.8-2.600 3.200-4.500 6-4.500z"/></svg>
         Continue with Google
-      </button>
-      <div class="or"><span>or</span></div>
+      </button>{/if}
+      {#if on('github')}<button class="btn gh" onclick={github} disabled={!auth.configured || auth.busy}>
+        <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 0a8 8 0 0 0-2.5 15.6c.4.1.5-.2.5-.4v-1.4c-2.200.5-2.700-1-2.700-1-.4-.9-.9-1.200-.9-1.200-.7-.5.100-.5.100-.5.800.100 1.200.8 1.200.8.700 1.200 1.900.9 2.300.7.100-.5.300-.9.500-1.100-1.800-.2-3.600-.9-3.600-4 0-.9.300-1.600.8-2.100-.1-.2-.4-1 .1-2.100 0 0 .7-.2 2.200.8a7.500 7.500 0 0 1 4 0c1.500-1 2.200-.8 2.200-.8.400 1.100.2 1.900.1 2.100.5.600.8 1.300.8 2.100 0 3.100-1.900 3.800-3.600 4 .3.300.5.800.5 1.500v2.200c0 .2.100.5.600.4A8 8 0 0 0 8 0z"/></svg>
+        Continue with GitHub
+      </button>{/if}
+      {#if on('google') || on('github')}<div class="or"><span>or</span></div>{/if}
       <form onsubmit={magic}>
         <label for="em" class="sr-only">Email</label>
         <input id="em" type="email" required placeholder="you@example.com" bind:value={email} disabled={!auth.configured} autocomplete="email" />
@@ -68,6 +80,8 @@
   code { font-family: var(--mono); font-size: 11px; }
   .g { width: 100%; background: #fff; color: #1b1f2a; border-color: #fff; font-weight: 600; }
   .g:hover { background: #f1f4fb; }
+  .gh { width: 100%; margin-top: 8px; background: #24292f; color: #fff; border-color: #444c56; font-weight: 600; }
+  .gh:hover { background: #2f363d; }
   .or { display: flex; align-items: center; gap: 10px; color: var(--text-faint); font-size: 12px; margin: 14px 0; }
   .or::before, .or::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
   form { display: grid; gap: 10px; }

@@ -17,6 +17,9 @@ export function applyRestored(): void {
   if (r.layers) for (const k of LAYER_KEYS) app.layers[k as LayerKey] = r.layers.includes(k);
   if (r.selection) app.selection = r.selection;
   if (r.lightningWindow) lightning.window = r.lightningWindow;
+  if (r.reduceFlashing) lightning.reduceFlashing = true;
+  // ?lightning=demo (a presentation / test entry point, not part of share links) switches the layer on
+  if (lightning.demoRequested) app.layers.lightning = true;
   if (r.years) history.years = r.years;
   if (r.minCategory !== undefined) history.minCategory = r.minCategory;
 }
@@ -32,6 +35,7 @@ export function currentShareState(pin: { lon: number; lat: number } | null): Sha
     model: app.modelId, variable: app.variable, level: app.level,
     layers, overlay: app.overlay, lightningWindow: lightning.window
   };
+  if (lightning.reduceFlashing) s.reduceFlashing = true;
   if (app.validMs !== null) s.t = app.validMs;
   if (app.selection) s.selection = app.selection;
   if (pin) s.pin = pin;

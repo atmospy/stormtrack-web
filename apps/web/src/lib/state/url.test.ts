@@ -51,3 +51,13 @@ describe('share-state URL', () => {
     expect(parse(q).selection).toEqual({ type: 'history', id: '2019-FANI' });
   });
 });
+
+describe('reduce-flashing share state', () => {
+  it('round-trips rf=1 and is absent otherwise; sound is never serialised', () => {
+    expect(serialize({ reduceFlashing: true })).toBe('rf=1');
+    expect(parse('rf=1').reduceFlashing).toBe(true);
+    expect(parse('rf=0').reduceFlashing).toBeUndefined();
+    expect(serialize({ reduceFlashing: false, lightningWindow: 5 })).toBe('lw=5');
+    expect(serialize({ ...({ sound: true } as object) })).toBe('');
+  });
+});

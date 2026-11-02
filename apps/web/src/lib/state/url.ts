@@ -22,6 +22,8 @@ export interface ShareState {
   overlay?: boolean;
   selection?: { type: 'active' | 'history'; id: string };
   lightningWindow?: (typeof LIGHTNING_WINDOWS)[number];
+  /** "Reduce flashing" accessibility setting (sound is deliberately NOT part of the URL: it needs a click) */
+  reduceFlashing?: boolean;
   pin?: { lon: number; lat: number };
   basins?: string[];
   years?: [number, number];
@@ -51,6 +53,7 @@ export function serialize(s: ShareState): string {
   if (s.layers) q.set('on', s.layers.join(',') || '-');
   if (s.selection) q.set('s', `${s.selection.type === 'active' ? 'a' : 'h'}:${s.selection.id}`);
   if (s.lightningWindow) q.set('lw', String(s.lightningWindow));
+  if (s.reduceFlashing) q.set('rf', '1');
   if (s.pin) q.set('pin', `${r(s.pin.lat, 3)},${r(s.pin.lon, 3)}`);
   if (s.basins) q.set('hb', s.basins.join(',') || '-');
   if (s.years) q.set('hy', `${s.years[0]}-${s.years[1]}`);
@@ -99,6 +102,7 @@ export function parse(search: string): ShareState {
   if (sm) out.selection = { type: sm[1] === 'a' ? 'active' : 'history', id: sm[2]! };
   const lw = finite(q.get('lw') ?? undefined);
   if (lw !== undefined && (LIGHTNING_WINDOWS as readonly number[]).includes(lw)) out.lightningWindow = lw as ShareState['lightningWindow'];
+  if (q.get('rf') === '1') out.reduceFlashing = true;
   const pin = q.get('pin')?.split(',');
   if (pin && pin.length === 2) {
     const la = finite(pin[0]), lo = finite(pin[1]);

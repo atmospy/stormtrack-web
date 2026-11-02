@@ -1,5 +1,5 @@
 <script lang="ts">
-  type Name = 'wind' | 'storm' | 'history' | 'fire' | 'quake' | 'event' | 'search' | 'play' | 'pause' | 'close' | 'user' | 'locate' | 'layers' | 'pin' | 'bell' | 'chevron' | 'help' | 'arrows' | 'step-back' | 'step-fwd' | 'link' | 'bolt' | 'chart';
+  type Name = 'wind' | 'storm' | 'history' | 'fire' | 'quake' | 'event' | 'search' | 'play' | 'pause' | 'close' | 'user' | 'locate' | 'layers' | 'pin' | 'bell' | 'chevron' | 'help' | 'arrows' | 'step-back' | 'step-fwd' | 'link' | 'bolt' | 'chart' | 'speaker' | 'speaker-off';
   let { name, size = 18 }: { name: Name; size?: number } = $props();
   const P: Record<Name, string> = {
     wind: 'M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8',
@@ -23,6 +23,8 @@
     'step-back': 'M6 5v14M19 5L9 12l10 7z',
     'step-fwd': 'M18 5v14M5 5l10 7-10 7z',
     bolt: 'M13 2L4 14h7l-1 8 9-12h-7z',
+    speaker: 'M4 9v6h4l5 4V5L8 9H4zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12',
+    'speaker-off': 'M4 9v6h4l5 4V5L8 9H4zM17 9.5l5 5M22 9.5l-5 5',
     chart: 'M4 19V5M4 19h16M8 15l3-4 3 2 5-6',
     link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1'
   };

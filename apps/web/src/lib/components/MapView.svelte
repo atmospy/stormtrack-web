@@ -11,7 +11,8 @@
   import { createWindLayer, WIND_RAMP, type WindLayerLike } from '#lib/wind/adapter';
   import { computeIsobars, createScalarLayer, rampFor, scalarMeta, type ScalarLayerLike, type IsobarResult } from '#lib/scalar/adapter';
   import { addIsobarLayers, setIsobars, setIsobarVisibility } from '#lib/map/isobars';
-  import { addLightningLayers, setAgeStyle, setCoverage, setFlashes, setLightningVisibility } from '#lib/map/lightning';
+  import { addLightningLayers, setCoverage, setLightningVisibility } from '#lib/map/lightning';
+  import type { LightningGLLayer } from '#lib/lightning/layer';
   import { applyHistoryFilter, decorate, setHistorySource } from '#lib/map/history';
   import { history, stormsNear } from '#lib/history/state.svelte';
   import { lightning } from '#lib/lightning/state.svelte';
@@ -287,20 +288,29 @@
       setLightningView(map);
     }
   });
-  let lastFlashes: unknown = null;
+  // the animated strike layer (WebGL, code-split): created the first time lightning is switched on
+  let glLayer = $state.raw<LightningGLLayer | null>(null);
+  let creatingGl = false;
   $effect(() => {
-    const f = lightning.bundle?.flashes ?? null;
-    if (!(ready && map) || f === lastFlashes) return;
-    lastFlashes = f;
-    setFlashes(map, f);
+    if (!(ready && map && app.layers.lightning) || glLayer || creatingGl) return;
+    creatingGl = true;
+    const m = map;
+    import('#lib/lightning/layer')
+      .then(({ LightningGLLayer }) => {
+        if (!map) return;
+        const l = new LightningGLLayer({ clock: lightning.playbackMs, windowS: lightning.window * 60 });
+        m.addLayer(l, m.getLayer('st-history') ? 'st-history' : undefined);
+        glLayer = l;
+        lightning.attachLayer(l);
+      })
+      .catch((e) => console.warn('lightning animation unavailable', e))
+      .finally(() => (creatingGl = false));
   });
-  // fade by age; the fade is slow (minutes), so a 5 s tick is plenty
   $effect(() => {
-    const b = lightning.bundle;
-    const now = lightning.nowMs;
-    const win = lightning.window;
-    if (!(ready && map && b?.flashes)) return;
-    setAgeStyle(map, (now - b.flashes.t0) / 1000, win * 60);
+    glLayer?.setVisible(app.layers.lightning && lightning.availability === 'ready');
+  });
+  $effect(() => {
+    glLayer?.setWindowS(lightning.window * 60);
   });
 
   // ---------- weather: wind particles ----------

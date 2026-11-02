@@ -7,6 +7,7 @@
   import Readout from '#lib/components/Readout.svelte';
   import Conditions from '#lib/components/Conditions.svelte';
   import StormPanel from '#lib/components/StormPanel.svelte';
+  import LightningHud from '#lib/components/LightningHud.svelte';
   import Provenance from '#lib/components/Provenance.svelte';
   import Weather from '#lib/components/Weather.svelte';
   import ShareSync from '#lib/components/ShareSync.svelte';
@@ -26,11 +27,26 @@
   import { weather } from '#lib/weather/runtime.svelte';
 
   // heavy/rare UI is code-split
+  /** ?sw=0: unregister service workers, clear this app's caches, reload without it */
+  function safeMode() {
+    const q = new URLSearchParams(location.search);
+    if (q.get('sw') !== '0') return;
+    void (async () => {
+      try {
+        for (const r of await navigator.serviceWorker?.getRegistrations() ?? []) await r.unregister();
+        for (const k of await caches.keys()) if (k.startsWith('stormtrack-')) await caches.delete(k);
+      } catch { /* best effort */ }
+      q.delete('sw');
+      const qs = q.toString();
+      location.replace(location.pathname + (qs ? '?' + qs : '') + location.hash);
+    })();
+  }
   const Palette = () => import('#lib/components/CommandPalette.svelte');
   const Auth = () => import('#lib/components/AuthModal.svelte');
   const Help = () => import('#lib/components/Help.svelte');
 
   onMount(() => {
+    safeMode();
     const ac = new AbortController();
     // debug/measurement handles (read-only use): the production build is inspected the same way as dev
     Object.assign(window, { __app: app, __wr: weather, __meteo: meteo, __lightning: lightning, __history: history });
@@ -79,6 +95,7 @@
     else if (k === ' ' && t?.tagName !== 'BUTTON') { e.preventDefault(); app.playing = !app.playing; }
     else if (k === 'arrowright' && t?.tagName !== 'INPUT') { app.playing = false; app.scrubTo(app.frameIdx + 1); gate.interact(); }
     else if (k === 'arrowleft' && t?.tagName !== 'INPUT') { app.playing = false; app.scrubTo(app.frameIdx - 1); gate.interact(); }
+    else if (k === 'm' && app.layers.lightning) void lightning.toggleSound();
     else if (k === '?') app.helpOpen = !app.helpOpen;
     else if (k === 'l') {
       navigator.geolocation?.getCurrentPosition(
@@ -105,6 +122,7 @@
   <Meteogram store={meteoPinned} pinned onclose={() => meteoPinned.close()} />
   <Weather />
   <ShareSync />
+  <LightningHud />
   <Provenance />
   {#if gate.show && !app.authOpen}<SignupCard />{/if}
   <Toasts />
