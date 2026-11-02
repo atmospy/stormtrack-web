@@ -226,7 +226,7 @@
 
   // ---------- data -> layers ----------
   $effect(() => {
-    if (ready && map && app.active) setActiveData(map, app.active);
+    if (ready && map && app.active) setActiveData(map, app.active, app.validMs);
   });
   $effect(() => {
     if (ready && map) setStormVisibility(map, { storms: app.layers.storms, history: app.layers.history });
