@@ -1,8 +1,10 @@
 import { SondeBook, parseSonde, sondeGeoJSON } from './parse';
+import { buildProfile, type Profile } from './skewt';
 
 const SNAPSHOT = 'https://api.v2.sondehub.org/sondes?last=3600';
 const FEED = 'wss://ws-reader.v2.sondehub.org/';
 const PUSH_MS = 2000;
+const TELEMETRY = 'https://api.v2.sondehub.org/sondes/telemetry';
 
 /**
  * Live radiosondes from SondeHub. Nothing is requested until the layer is switched on: then one snapshot of the
@@ -12,7 +14,13 @@ const PUSH_MS = 2000;
 class Sondes {
   status = $state<'off' | 'connecting' | 'live' | 'error'>('off');
   count = $state(0);
+  /** the sonde whose Skew-T is open */
+  selected = $state<{ serial: string; type: string } | null>(null);
+  profile = $state.raw<Profile | null>(null);
+  profileState = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  profileNote = $state('');
   private book = new SondeBook();
+  private token = 0;
   private client: { end(force?: boolean): void } | null = null;
   private timer = 0;
   private sink: ((g: ReturnType<typeof sondeGeoJSON>) => void) | null = null;
@@ -63,7 +71,40 @@ class Sondes {
     }
   }
 
+  /** Open (or close, with null) the Skew-T of a sonde: one request for its last 6 hours of telemetry. */
+  async select(s: { serial: string; type: string } | null): Promise<void> {
+    const mine = ++this.token;
+    this.selected = s;
+    this.profile = null;
+    this.profileNote = '';
+    if (!s) {
+      this.profileState = 'idle';
+      return;
+    }
+    this.profileState = 'loading';
+    try {
+      const r = await fetch(`${TELEMETRY}?serial=${encodeURIComponent(s.serial)}&duration=6h`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const p = buildProfile(await r.json(), s.serial);
+      if (mine !== this.token) return; // another sonde was picked meanwhile
+      if (!p) {
+        this.profileState = 'error';
+        this.profileNote = 'This sonde has not sent enough pressure and temperature readings yet.';
+        return;
+      }
+      this.profile = p;
+      this.profileState = 'ready';
+    } catch (e) {
+      if (mine !== this.token) return;
+      console.warn('sonde profile unavailable', e);
+      this.profileState = 'error';
+      this.profileNote = 'Could not load this flight from SondeHub.';
+    }
+  }
+
   stop(): void {
+    this.selected = null;
+    this.profileState = 'idle';
     window.clearInterval(this.timer);
     this.client?.end(true);
     this.client = null;

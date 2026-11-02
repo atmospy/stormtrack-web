@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import WindArrow from './WindArrow.svelte';
+  import { sondes } from '#lib/sondes/state.svelte';
   import { app } from '#lib/stores/app.svelte';
   import { weather } from '#lib/weather/runtime.svelte';
   import { CITIES } from '#lib/data/cities';
@@ -48,7 +49,7 @@
 </script>
 
 {#if app.weatherReady}
-  <section class="card glass" aria-label="Current conditions" class:hidden={app.selection !== null && !open}>
+  <section class="card glass" aria-label="Current conditions" class:hidden={(app.selection !== null && !open) || sondes.selected !== null}>
     <header>
       <span class="label">{isUser ? 'Your location' : 'View centre'}</span>
       <button class="btn ghost icon" onclick={locate} aria-label="Use my location" title="Use my location"><Icon name="locate" size={15} /></button>
