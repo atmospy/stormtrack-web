@@ -21,6 +21,7 @@
     {#if w}<span>{w.name} · {runShort} · {fmtAgo(w.generated, now)}</span>{:else}<span>Loading data…</span>{/if}
     {#if anySample}<span class="sample" title="Sample data in use: {[app.weatherSample && 'weather', app.stormsSample && 'storms', app.hazardsSample && 'hazards', app.layers.lightning && lightning.bundle?.sample && 'lightning'].filter(Boolean).join(', ')}">SAMPLE</span>{/if}
   </button>
+  <span class="legal"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>
   {#if open}
     <div class="more glass" role="region" aria-label="Data sources">
       <h3>Data &amp; sources</h3>
@@ -37,7 +38,10 @@
 </footer>
 
 <style>
-  .prov { position: absolute; left: var(--gap); bottom: calc(var(--gap) + var(--safe-b)); z-index: 4; max-width: calc(50vw - 344px); }
+  .prov { position: absolute; left: var(--gap); bottom: calc(var(--gap) + var(--safe-b)); z-index: 4; max-width: calc(50vw - 344px); display: flex; align-items: center; gap: 10px; }
+  .legal { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
+  .legal a { color: inherit; text-decoration: none; }
+  .legal a:hover { color: var(--text); text-decoration: underline; }
   .line { max-width: 100%; }
   .line { padding: 5px 10px; font-size: 11px; color: var(--text-dim); display: flex; gap: 8px; align-items: center; border-radius: 9px; text-align: left; }
   .line span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

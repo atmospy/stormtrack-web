@@ -188,12 +188,33 @@ Settings -> Secrets and variables -> Actions. Create GitHub **Environments** `pr
 | `PUBLIC_DATA_BASE` | variable | `https://data.DOMAIN` | `deploy-web.yml`, `ci.yml` |
 | `PUBLIC_API_BASE` | variable (optional) | Render service URL | `deploy-web.yml` |
 | `PUBLIC_SITE_URL` | variable | `https://DOMAIN` | `deploy-web.yml` |
+| `PUBLIC_CONTACT_EMAIL` | variable (optional) | where privacy requests go; shown on `/privacy` and `/terms`. Empty means the pages point to the GitHub issue tracker | `deploy-web.yml` |
 | `CF_PAGES_PROJECT` | variable (optional) | default `stormtrack-web` | `deploy-web.yml` |
 | `INGEST_ENABLED` | variable (optional) | set to `false` to pause all scheduled ingest | `ingest.yml` |
 | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` | not needed in GitHub (migrations are applied from your laptop; see rollback) | | |
 
 `PUBLIC_*` values are intentionally **variables, not secrets**: they are baked into the public
 bundle anyway.
+
+**Cloudflare Pages builds do not see GitHub variables.** If the site is built by Pages itself (git
+integration) and not by `deploy-web.yml`, set every `PUBLIC_*` value in the Pages project too
+(Settings -> Variables and Secrets), then redeploy: a variable only takes effect on a new build.
+Without `PUBLIC_DATA_BASE` the site falls back to its built-in sample data.
+
+### Sign-in screens (Google and GitHub)
+
+The consent screens show the address sign-in returns to, which is the Supabase project address.
+That cannot be hidden without a Supabase custom domain (a paid add-on; check current pricing).
+What you can set:
+
+- **Supabase -> Authentication -> URL Configuration:** Site URL `https://DOMAIN`; Redirect URLs
+  for `https://DOMAIN/**` (and the exact `https://DOMAIN/`), the `pages.dev` address, and
+  `http://localhost:5173/**`. A wrong Site URL sends people to the wrong site after sign-in.
+- **Google Cloud -> Google Auth Platform -> Branding:** app name StormTrack, logo
+  `docs/brand/stormtrack-mark-120.png`, home page `https://DOMAIN`, privacy policy
+  `https://DOMAIN/privacy`, terms `https://DOMAIN/terms`, authorized domain of the site.
+- **GitHub -> OAuth app settings:** homepage `https://DOMAIN`, logo
+  `docs/brand/stormtrack-mark-512.png`.
 
 ---------------------------------------------------------------------------------------
 
