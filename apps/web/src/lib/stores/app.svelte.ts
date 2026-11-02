@@ -124,6 +124,14 @@ class AppState {
     this.validMs = t[Math.max(0, Math.min(t.length - 1, i))]!;
   }
 
+  /** Move the time slider to the frame nearest `ms`; false (and no change) when `ms` is outside the weather timeline. */
+  scrubToMs(ms: number): boolean {
+    const t = this.times;
+    if (!t.length || !Number.isFinite(ms) || ms < t[0]! - 3 * 3600e3 || ms > t[t.length - 1]! + 3 * 3600e3) return false;
+    this.validMs = t[nearestIndex(t, ms)]!;
+    return true;
+  }
+
   /** Switch model keeping variable/level/time where the new model has them (nearest otherwise). */
   setModel(id: string): void {
     const lm = this.models[id];

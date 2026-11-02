@@ -151,6 +151,9 @@
       if (sid) {
         popup?.remove();
         app.select({ type: 'active', id: sid });
+        // a forecast or track point also moves the time slider to that moment
+        const pt = st.find((f) => f.layer.id === 'st-fc-pts' || f.layer.id === 'st-track-pts');
+        if (pt && typeof pt.properties?.t === 'number') app.scrubToMs(pt.properties.t);
         const at = app.active ? groupStorms(app.active).get(sid)?.position.geometry.coordinates : undefined;
         if (at) meteo.open(at[0]!, at[1]!);
         return;
