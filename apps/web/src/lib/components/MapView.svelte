@@ -18,7 +18,6 @@
   import { history, stormsNear } from '#lib/history/state.svelte';
   import { lightning } from '#lib/lightning/state.svelte';
   import { restored } from '#lib/state/share.svelte';
-  import { groupStorms } from '#lib/data/active';
   import { darkStyle } from '#lib/map/style';
   import { ACTIVE_HIT_LAYERS, HISTORY_LAYER, addStormLayers, setActiveData, setHighlight, setStormVisibility, startPulse } from '#lib/map/storms';
   import { setSatellite } from '#lib/map/satellite';
@@ -159,8 +158,6 @@
         // a forecast or track point also moves the time slider to that moment
         const pt = st.find((f) => f.layer.id === 'st-fc-pts' || f.layer.id === 'st-track-pts');
         if (pt && typeof pt.properties?.t === 'number') app.scrubToMs(pt.properties.t);
-        const at = app.active ? groupStorms(app.active).get(sid)?.position.geometry.coordinates : undefined;
-        if (at) meteo.open(at[0]!, at[1]!);
         return;
       }
       const sd = hits(m, e, SONDE_HIT_LAYERS)[0];
