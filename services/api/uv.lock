@@ -1162,13 +1162,17 @@ wheels = [
 
 [[package]]
 name = "stormtrack"
-version = "0.3.1.dev3+g8acddf7c1"
-source = { git = "https://github.com/atmospy/stormtrack?branch=main#8acddf7c1b03ce6965b09244c8b84464bdadc680" }
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pyarrow", version = "25.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pyarrow", version = "26.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ed/50/d925817a6044032769c733ebeaac9fd697ab963c7a1fa6f3838ed227cbf6/stormtrack-0.4.0.tar.gz", hash = "sha256:b54633048f252e1653c34ee13d65f4e932120acdecdf38ebe6be372dfc3b2aad", size = 2543151, upload-time = "2026-11-02T06:14:29.222Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/c5/7cbe76f0a9ab83c74fdf2a816efa39b409a9a0c98ba2f0a3f626b8a1de90/stormtrack-0.4.0-py3-none-any.whl", hash = "sha256:b2c20b845e144bd8c001b60caa3346e75fc14dd41a8ec4b78240977a49289a22", size = 74852, upload-time = "2026-11-02T06:14:27.206Z" },
 ]
 
 [package.optional-dependencies]
@@ -1209,7 +1213,7 @@ requires-dist = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "pyarrow" },
-    { name = "stormtrack", extras = ["xarray"], git = "https://github.com/atmospy/stormtrack?branch=main" },
+    { name = "stormtrack", extras = ["xarray"], specifier = ">=0.4.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
 ]
 

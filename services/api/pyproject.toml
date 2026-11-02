@@ -3,14 +3,11 @@ name = "stormtrack-api"
 version = "0.1.0"
 description = "Minimal analysis API for StormTrack Web (wraps the stormtrack library)"
 requires-python = ">=3.10"
-dependencies = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "stormtrack[xarray]", "pandas", "numpy", "pyarrow"]
+dependencies = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "stormtrack[xarray]>=0.4.0", "pandas", "numpy", "pyarrow"]
 
 [dependency-groups]
 dev = ["pytest", "httpx"]
 
-# Until stormtrack is on PyPI it comes from GitHub (replace with the PyPI release once stormtrack is published there).
-[tool.uv.sources]
-stormtrack = { git = "https://github.com/atmospy/stormtrack", branch = "main" }
 
 [build-system]
 requires = ["hatchling"]
