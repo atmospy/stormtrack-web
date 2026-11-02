@@ -13,12 +13,18 @@ import os
 from pathlib import Path
 from typing import Iterable
 
-CONTENT_TYPES = {".geojson": "application/geo+json", ".json": "application/json"}
+CONTENT_TYPES = {
+    ".geojson": "application/geo+json",
+    ".json": "application/json",
+    ".jpg": "image/jpeg",
+}
 # short cache for pointers/live data, longer for slow-changing history & stats
 CACHE = {
     "index.json": "public, max-age=60",
     "active.geojson": "public, max-age=300",
     "latest.geojson": "public, max-age=300",
+    "insat-ir.json": "public, max-age=300",
+    "insat-ir.jpg": "public, max-age=300",
 }
 CACHE_DEFAULT = "public, max-age=3600"
 

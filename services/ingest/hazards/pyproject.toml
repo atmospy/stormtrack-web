@@ -8,6 +8,7 @@ dependencies = ["boto3"]
 [project.scripts]
 ingest-hazards = "hazards_ingest.cli:main"
 ingest-nowcast = "hazards_ingest.nowcast:main"
+ingest-satellite = "hazards_ingest.satellite:main"
 
 [dependency-groups]
 dev = ["pytest", "moto[s3]"]
