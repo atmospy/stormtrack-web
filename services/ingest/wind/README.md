@@ -50,7 +50,7 @@ wind/latest.json, wind/<run>/fFFF.png      legacy v1 (GFS 10 m wind, byte-identi
 | model | where | per-frame files | steps |
 |---|---|---|---|
 | GFS | `s3://noaa-gfs-bdp-pds/gfs.YYYYMMDD/HH/atmos/gfs.tHHz.pgrb2.0p25.fFFF` + `.idx` | one GRIB per hour, byte ranges from the `.idx` | hourly to 120 h, 3-hourly to 384 h; 4 cycles |
-| IFS | `ecmwf-forecasts.s3.eu-central-1.amazonaws.com/YYYYMMDD/HHz/ifs/0p25/oper/YYYYMMDDHH0000-<step>h-oper-fc.grib2` + `.index` | JSON-lines index with `_offset/_length` | 00/12Z: 3-hourly to 144 h then 6-hourly to 360 h; 06/18Z: 3-hourly to 144 h |
+| IFS | `<mirror>/YYYYMMDD/HHz/ifs/0p25/oper/YYYYMMDDHH0000-<step>h-oper-fc.grib2`, where `<mirror>` is `data.ecmwf.int/forecasts`, `storage.googleapis.com/ecmwf-open-data` or `ecmwf-forecasts.s3.eu-central-1.amazonaws.com` (chosen at run time, see below) + `.index` | JSON-lines index with `_offset/_length` | 00/12Z: 3-hourly to 144 h then 6-hourly to 360 h; 06/18Z: 3-hourly to 144 h |
 | AIFS | same bucket, `.../aifs-single/0p25/oper/...` | same | 6-hourly to 360 h, all four cycles |
 
 GRIB records used: GFS `UGRD/VGRD:10 m above ground`, `UGRD/VGRD:<p> mb`, `PRMSL:mean sea level`
@@ -128,3 +128,13 @@ deletes remote runs older than the newest `--keep`. Keys are `<R2_PREFIX>/wind/.
 `verify.py` decodes a PNG back to u/v (`encode.decode_png`, `verify.point(png, lat, lon)`) and checks
 max |error| <= half the quantisation step (100/255/2 = 0.196 m/s) against the resampled source, plus
 sanity: max speed < 70, area-weighted mean 3-9 m/s, mean u > 0 at 45N and < 0 at 10N.
+
+
+### ECMWF mirrors
+
+The same open-data files are served by ECMWF and by two public mirrors. Measured on 2 Nov 2026 with 12 sequential
+1 MB range reads: the AWS mirror failed 9 of 12 (HTTP 503), ECMWF's own server and Google's mirror served all 12.
+The ingest therefore tries `data.ecmwf.int`, then Google, then AWS, using the first that passes a small range read
+(`ecmwf_base` in `models.py`), decided once per run. `ECMWF_BASE=<url>` forces a mirror. ECMWF limits the portal to
+a few hundred to a couple of thousand simultaneous connections, so requests stay paced and single-threaded.
+A full 72 h IFS download (225 frames) took about 7 minutes with one transient 503.

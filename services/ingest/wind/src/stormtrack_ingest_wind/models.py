@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -238,7 +239,43 @@ class GFS(Model):
 
 # ---- ECMWF open data ------------------------------------------------------------------------
 
-ECMWF_BUCKET = "https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com"
+# The same files are served by ECMWF itself and by two public mirrors. In practice the AWS mirror answers 503
+# to most requests (12 sequential 1 MB range reads: 9 failed), while ECMWF's own server and Google's mirror
+# served all 12. The first base that passes a small range read is used; ECMWF_BASE forces one.
+ECMWF_BASES = (
+    "https://data.ecmwf.int/forecasts",
+    "https://storage.googleapis.com/ecmwf-open-data",
+    "https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com",
+)
+_BASE_CHOSEN: dict = {}
+
+
+def ecmwf_base(run, sub: str) -> str:
+    """The mirror to read from, decided once per process (and per run) by a small range read of the first file."""
+    forced = os.environ.get("ECMWF_BASE")
+    if forced:
+        return forced.rstrip("/")
+    key = (run, sub)
+    if key not in _BASE_CHOSEN:
+        probe = f"{run:%Y%m%d}/{run:%H}z/{sub}/{run:%Y%m%d%H}0000-0h-oper-fc.grib2"
+        for base in ECMWF_BASES:
+            try:
+                http.get(f"{base}/{probe}", byte_range=(0, 255), timeout=20, tries=3)
+                _BASE_CHOSEN[key] = base
+                log.info("ECMWF mirror: %s", base)
+                break
+            except http.NotFound:
+                # not published yet (a run still being uploaded): says nothing about the mirrors, so decide later
+                return ECMWF_BASES[0]
+            except Exception as e:  # noqa: BLE001 - any failure means try the next mirror
+                log.warning("ECMWF mirror %s not usable (%s)", base, str(e)[:80])
+        else:
+            _BASE_CHOSEN[key] = ECMWF_BASES[
+                0
+            ]  # nothing answered: let the normal retries report the real error
+    return _BASE_CHOSEN[key]
+
+
 ECMWF_ATTRIBUTION = (
     "ECMWF open data, licensed CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/). "
     "Copyright © European Centre for Medium-Range Weather Forecasts (ECMWF). "
@@ -251,7 +288,7 @@ class ECMWF(Model):
     sub = ""  # path below <run>/, e.g. "ifs/0p25/oper"
 
     def url(self, run, fhr):
-        return f"{ECMWF_BUCKET}/{run:%Y%m%d}/{run:%H}z/{self.sub}/{run:%Y%m%d%H}0000-{fhr}h-oper-fc"
+        return f"{ecmwf_base(run, self.sub)}/{run:%Y%m%d}/{run:%H}z/{self.sub}/{run:%Y%m%d%H}0000-{fhr}h-oper-fc"
 
     def data_url(self, run, fhr):
         return self.url(run, fhr) + ".grib2"
