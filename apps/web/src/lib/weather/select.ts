@@ -36,10 +36,21 @@ export function windFields(m: WeatherModel): VectorField[] {
 export function levelsOf(m: WeatherModel): string[] {
   return windFields(m).map(levelKey);
 }
-export function scalarField(m: WeatherModel, v: Variable): ScalarField | null {
-  const id = VARIABLES.find((x) => x.id === v)?.field;
-  const f = m.fields.find((x) => x.id === id);
+/** Temperature field id for a level: "t2m" at the surface, "t@500hPa" on a pressure level. */
+export const tempFieldId = (level: string): string => (level === '10m' ? 't2m' : `t@${level}hPa`);
+/** The scalar field of a variable. Temperature follows the level when the model has it, else it is the 2 m field. */
+export function scalarField(m: WeatherModel, v: Variable, level = '10m'): ScalarField | null {
+  const id = v === 'temperature' ? tempFieldId(level) : VARIABLES.find((x) => x.id === v)?.field;
+  const f = m.fields.find((x) => x.id === id) ?? (v === 'temperature' ? m.fields.find((x) => x.id === 't2m') : undefined);
   return f && f.kind === 'scalar' ? f : null;
+}
+/** Levels with a temperature field, in display order ("10m" stands for the 2 m field). */
+export function tempLevels(m: WeatherModel): string[] {
+  return LEVEL_ORDER.filter((l) => m.fields.some((f) => f.kind === 'scalar' && f.id === tempFieldId(l)));
+}
+/** The level a temperature view actually shows: the requested one if the model has it, else the surface. */
+export function tempLevelShown(m: WeatherModel, level: string): string {
+  return tempLevels(m).includes(level) ? level : '10m';
 }
 export function variablesOf(m: WeatherModel): Variable[] {
   return VARIABLES.filter((v) => (v.id === 'wind' ? windFields(m).length > 0 : scalarField(m, v.id))).map((v) => v.id);
@@ -51,7 +62,7 @@ export function windFieldAt(m: WeatherModel, level: string): VectorField | null 
 }
 /** The field that defines the time axis for the current selection. */
 export function primaryField(m: WeatherModel, v: Variable, level: string): WeatherField | null {
-  return v === 'wind' ? windFieldAt(m, level) : scalarField(m, v);
+  return v === 'wind' ? windFieldAt(m, level) : scalarField(m, v, level);
 }
 
 // ---------- time ----------

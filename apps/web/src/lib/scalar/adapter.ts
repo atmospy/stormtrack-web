@@ -18,9 +18,33 @@ export async function createScalarLayer(opts: { id: string; ramp: ScalarRamp; op
   return new m.ScalarLayer(opts);
 }
 
-export async function rampFor(v: Variable): Promise<ScalarRamp | null> {
+/** Temperature range worth colouring at each pressure level (degC); the surface ramp spans -30..45. */
+const TEMP_SPAN: Record<string, [number, number]> = {
+  '850': [-30, 35],
+  '700': [-35, 20],
+  '500': [-50, -5],
+  '300': [-65, -25],
+  '250': [-70, -30]
+};
+const SURFACE_SPAN: [number, number] = [-30, 45];
+const retargeted = new Map<string, ScalarRamp>();
+
+/** Colour ramp for a variable; temperature on a pressure level reuses the surface colours over that level's range. */
+export async function rampFor(v: Variable, level = '10m'): Promise<ScalarRamp | null> {
   const m = await load();
-  return v === 'pressure' ? m.SCALAR_RAMPS.pressure : v === 'temperature' ? m.SCALAR_RAMPS.temperature : v === 'precipitation' ? m.SCALAR_RAMPS.precipitation : null;
+  if (v === 'temperature') {
+    const span = TEMP_SPAN[level];
+    if (!span) return m.SCALAR_RAMPS.temperature;
+    let r = retargeted.get(level);
+    if (!r) {
+      const [a, b] = SURFACE_SPAN;
+      const k = (span[1] - span[0]) / (b - a);
+      r = { ...m.SCALAR_RAMPS.temperature, stops: m.SCALAR_RAMPS.temperature.stops.map(([x, c]) => [span[0] + (x - a) * k, c] as [number, string]) };
+      retargeted.set(level, r);
+    }
+    return r;
+  }
+  return v === 'pressure' ? m.SCALAR_RAMPS.pressure : v === 'precipitation' ? m.SCALAR_RAMPS.precipitation : null;
 }
 
 const metas = new WeakMap<ScalarField, ScalarFrameMeta>();

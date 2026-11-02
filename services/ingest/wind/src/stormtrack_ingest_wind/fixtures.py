@@ -128,6 +128,9 @@ def world_fields(d: float, fhr: int):
             np.exp(-(((np.degrees(la) - 40) / 8) ** 2))
         )
         f[f"v{p}"] = k * 5 * np.sin(2 * lo) * np.cos(la)
+        # air temperature (K): standard-atmosphere mean per level, warm tropics, cold poles
+        mean_k = {850: 278.0, 700: 266.0, 500: 250.0, 300: 228.0, 250: 222.0}[p]
+        f[f"t{p}"] = mean_k + 25 * (np.cos(la) ** 2 - 2 / 3) + 3 * np.sin(lo)
     return {k: v.astype(np.float64) for k, v in f.items()}
 
 
@@ -149,6 +152,8 @@ class FakeWorld:
         for p in (250, 300, 500, 700, 850):
             recs.append(("UGRD", f"{p} mb", _grib("u", f[f"u{p}"], self.d, 0, "isobaricInhPa", p)))
             recs.append(("VGRD", f"{p} mb", _grib("v", f[f"v{p}"], self.d, 0, "isobaricInhPa", p)))
+        for p in (250, 300, 500, 700, 850):
+            recs.append(("TMP", f"{p} mb", _grib("t", f[f"t{p}"], self.d, 0, "isobaricInhPa", p)))
         recs.append(("TMP", "2 m above ground", _grib("2t", pa("2t"), self.d)))
         recs.append(("UGRD", "10 m above ground", _grib("10u", pa("10u"), self.d)))
         recs.append(("VGRD", "10 m above ground", _grib("10v", pa("10v"), self.d)))
@@ -180,6 +185,9 @@ class FakeWorld:
             )
             recs.append(
                 ("v", "pl", str(p), _grib("v", f[f"v{p}"], self.d, 180.0, "isobaricInhPa", p))
+            )
+            recs.append(
+                ("t", "pl", str(p), _grib("t", f[f"t{p}"], self.d, 180.0, "isobaricInhPa", p))
             )
         body, rows, off = b"", [], 0
         for param, lt, lv, msg in recs:

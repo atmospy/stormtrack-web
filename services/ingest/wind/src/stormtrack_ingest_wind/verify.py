@@ -84,8 +84,18 @@ def _band(a: np.ndarray, lo: float, hi: float) -> float:
     return float(a[m].mean())
 
 
+# plausible area-weighted global mean air temperature (degC) by pressure level
+_T_LEVEL_MEAN = {
+    850: (-2.0, 12.0),
+    700: (-14.0, 2.0),
+    500: (-28.0, -12.0),
+    300: (-55.0, -38.0),
+    250: (-60.0, -42.0),
+}
+
+
 def plausibility(slug: str, fhr: int, **arrays) -> dict:
-    """Physical sanity of a decoded global field. mslp/t2m/precip: x=...; winds: u=..., v=..."""
+    """Physical sanity of a decoded global field. mslp/t2m/t_*/precip: x=...; winds: u=..., v=..."""
     if slug.startswith("wind_"):
         u, v = arrays["u"], arrays["v"]
         sp = np.hypot(u, v)
@@ -138,6 +148,22 @@ def plausibility(slug: str, fhr: int, **arrays) -> dict:
             and r["min"] < -25
             and r["max"] > 35
             and r["mean_poles"] < r["mean_tropics"] - 20
+        )
+    elif slug.startswith("t_"):
+        # air temperature on a pressure level: broad bounds around the standard atmosphere, so a wrong
+        # level, a unit slip (K) or a scrambled field fails while real weather never does
+        lo, hi = _T_LEVEL_MEAN[int(slug[2:])]
+        r = {
+            "min": float(x.min()),
+            "max": float(x.max()),
+            "mean": _areaw(x),
+            "mean_poles": _band(x, 75, 90),
+            "mean_tropics": _band(x, 0, 15),
+        }
+        r["ok"] = bool(
+            lo <= r["mean"] <= hi
+            and r["mean_poles"] < r["mean_tropics"] - 5
+            and r["max"] - r["min"] > 20
         )
     elif slug == "precip":
         r = {

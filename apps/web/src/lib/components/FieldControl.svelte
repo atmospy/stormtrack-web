@@ -2,14 +2,20 @@
   import Legend from './Legend.svelte';
   import { app } from '#lib/stores/app.svelte';
   import { gate } from '#lib/stores/gate.svelte';
-  import { LEVEL_ORDER, VARIABLES, levelDescription, levelsOf, variablesOf } from '#lib/weather/select';
+  import { LEVEL_ORDER, VARIABLES, levelDescription, levelsOf, tempLevels, tempLevelShown, variablesOf } from '#lib/weather/select';
 
   const SHORT: Record<string, string> = { gfs: 'GFS', 'ecmwf-ifs': 'IFS', 'ecmwf-aifs': 'AIFS' };
   const models = $derived(app.catalogue.filter((e) => app.models[e.id]));
   const model = $derived(app.model);
   const vars = $derived(model ? VARIABLES.filter((v) => variablesOf(model).includes(v.id)) : []);
-  const levels = $derived(model ? levelsOf(model) : []);
-  const showLevels = $derived(app.variable === 'wind' || app.overlay);
+  const windLevels = $derived(model ? levelsOf(model) : []);
+  const isTemp = $derived(app.variable === 'temperature');
+  /** Temperature picks its own levels ("2 m" is the surface field); wind and the other fields use the wind levels. */
+  const levels = $derived(isTemp && model ? tempLevels(model) : windLevels);
+  const shown = $derived(isTemp && model ? tempLevelShown(model, app.level) : app.level);
+  const showLevels = $derived(isTemp || app.variable === 'wind' || app.overlay);
+  const levelName = (l: string) => (l === '10m' ? (isTemp ? '2 m' : '10 m') : l);
+  const levelTitle = (l: string) => (l === '10m' && isTemp ? '2 m above ground' : levelDescription(l));
   const pick = (fn: () => void) => () => { fn(); gate.interact(); };
 </script>
 
@@ -32,15 +38,15 @@
     </div>
 
     {#if showLevels && levels.length > 1}
-      <div class="lv" role="group" aria-label="Wind level">
+      <div class="lv" role="group" aria-label={isTemp ? 'Temperature level' : 'Wind level'}>
         {#each LEVEL_ORDER.filter((l) => levels.includes(l)) as l (l)}
-          <button class:on={app.level === l} aria-pressed={app.level === l} title={levelDescription(l)} onclick={pick(() => app.setLevel(l))}>{l === '10m' ? '10 m' : l}</button>
+          <button class:on={shown === l} aria-pressed={shown === l} title={levelTitle(l)} onclick={pick(() => app.setLevel(l))}>{levelName(l)}</button>
         {/each}
       </div>
-      <div class="lvd tnum">{levelDescription(app.level)}</div>
+      <div class="lvd tnum">{levelTitle(shown)}</div>
     {/if}
 
-    {#if app.variable !== 'wind' && levels.length}
+    {#if app.variable !== 'wind' && windLevels.length}
       <label class="ov"><input type="checkbox" bind:checked={app.overlay} /> Wind particles on top</label>
     {/if}
 

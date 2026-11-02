@@ -137,7 +137,7 @@ class AppState {
   }
   setLevel(l: string): void {
     this.level = l;
-    this.variable = 'wind';
+    if (this.variable !== 'temperature') this.variable = 'wind';
     this.normalise();
   }
   /** Make variable/level valid for the current model; snap the time into its range. */

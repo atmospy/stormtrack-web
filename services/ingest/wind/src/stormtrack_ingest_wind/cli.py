@@ -44,7 +44,7 @@ def main(argv=None) -> int:
     ap.add_argument(
         "--fields",
         default=None,
-        help="comma list of wind, mslp, t2m, precip (default all) or exact slugs e.g. wind_850",
+        help="comma list of wind, mslp, t2m, t, precip (default all) or exact slugs e.g. wind_850, t_500",
     )
     ap.add_argument(
         "--levels",

@@ -2,7 +2,7 @@
 
 Every model exposes the same small interface (`Model`). `fetch` returns, per requested field, the
 data on the model's *native* 0.25 degree grid (north-first rows, longitudes -180..180) in display
-units: wind in m/s, mslp in hPa, t2m in degC and precip as the **cumulative** depth in mm since the
+units: wind in m/s, mslp in hPa, t2m and t (temperature on pressure levels) in degC and precip as the **cumulative** depth in mm since the
 start of the forecast (the pipeline differences consecutive frames into per-interval depths).
 """
 
@@ -72,7 +72,7 @@ def _convert(spec: FieldSpec, m: grib.Msg) -> np.ndarray:
             return a / 100.0
         if u == "hPa":
             return a
-    elif spec.group == "t2m":
+    elif spec.group in ("t2m", "t"):
         if u == "K":
             return a - np.float32(273.15)
         if u in ("C", "degC"):
@@ -221,6 +221,8 @@ class GFS(Model):
             return {"x": ("PRMSL", "mean sea level")}
         if spec.group == "t2m":
             return {"x": ("TMP", "2 m above ground")}
+        if spec.group == "t":
+            return {"x": ("TMP", f"{spec.pressure} mb")}
         if spec.group == "precip":
             return {"x": ("APCP", "surface")}
         raise KeyError(spec.slug)
@@ -313,6 +315,8 @@ class ECMWF(Model):
                 return {"u": ("10u", "sfc", ""), "v": ("10v", "sfc", "")}
             p = str(spec.pressure)
             return {"u": ("u", "pl", p), "v": ("v", "pl", p)}
+        if spec.group == "t":
+            return {"x": ("t", "pl", str(spec.pressure))}
         return {
             "x": {
                 "mslp": ("msl", "sfc", ""),

@@ -402,7 +402,7 @@
     if (!(ready && map && sc) || scalarLayer || creatingScalar) return;
     creatingScalar = true;
     (async () => {
-      const ramp = await rampFor(app.variable);
+      const ramp = await rampFor(app.variable, app.level);
       if (!ramp || !map) return;
       const layer = await createScalarLayer({ id: SCALAR_ID, ramp, opacity: app.variable === 'pressure' ? 0.6 : 0.92 });
       const w = weather.scalar;
@@ -426,9 +426,10 @@
   // ramp follows the variable
   $effect(() => {
     const v = app.variable;
+    const lv = app.level;
     const layer = scalarLayer;
     if (!layer || v === 'wind') return;
-    void rampFor(v).then((r) => r && layer.setRamp(r));
+    void rampFor(v, lv).then((r) => r && layer.setRamp(r));
   });
 
   // isobars for MSLP: computed in the package's worker, cached per frame so playback never recomputes
