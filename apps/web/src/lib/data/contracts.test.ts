@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ContractError, parseActiveStorms, parseHazardIndex, parseHazardPoints, parseHistory, parseStats, parseWindLatest } from './contracts';
+import { ContractError, parseActiveStorms, parseHazardIndex, parseHazardPoints, parseHistory, parseStats, parseWindLatest, parseNowcast } from './contracts';
 
 const sample = (p: string) => JSON.parse(readFileSync(resolve(__dirname, '../../../../../public-data/sample', p), 'utf8'));
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -102,5 +102,32 @@ describe('history / stats / hazards', () => {
   it('hazard parser drops malformed features instead of failing', () => {
     const r = parseHazardPoints({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: null, properties: {} }, { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 2] }, properties: { id: 'a' } }] });
     expect(r.features).toHaveLength(1);
+  });
+});
+
+describe('parseNowcast', () => {
+  const poly = { type: 'MultiPolygon', coordinates: [[[[80, 20], [81, 20], [81, 21], [80, 20]]]] };
+  const base = { type: 'FeatureCollection', generated: '2026-11-02T14:39:25Z', newest_issue: '2026-11-02T14:30:00Z', stale: false, counts: { light: 1, moderate: 1, severe: 0 }, attribution: 'IMD' };
+
+  it('keeps well-formed polygon districts and repairs odd property values', () => {
+    const f = parseNowcast({
+      ...base,
+      features: [
+        { type: 'Feature', geometry: poly, properties: { district: 'Baragarh', level: 2, color: '#ff7900', warnings: ['Moderate rain', 7], issued: 'a', valid_until: 'b' } },
+        { type: 'Feature', geometry: poly, properties: { level: 9, color: 'javascript:alert(1)' } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 2] }, properties: {} },
+        'garbage'
+      ]
+    });
+    expect(f.features).toHaveLength(2);
+    expect(f.features[0]!.properties.warnings).toEqual(['Moderate rain']);
+    expect(f.features[1]!.properties).toMatchObject({ district: 'District', level: 1, color: '#ffbf00' }); // bad level and colour are replaced
+    expect(f.counts).toEqual({ light: 1, moderate: 1, severe: 0 });
+    expect(f.stale).toBe(false);
+  });
+
+  it('rejects something that is not a feature collection', () => {
+    expect(() => parseNowcast({ type: 'Other', features: [] })).toThrow();
+    expect(() => parseNowcast({ type: 'FeatureCollection' })).toThrow();
   });
 });

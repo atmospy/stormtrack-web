@@ -391,3 +391,50 @@ export function parseHazardPoints(raw: unknown): GeoJSON.FeatureCollection<GeoJS
   }
   return { type: 'FeatureCollection', features };
 }
+
+
+/** India district nowcast warnings (`nowcast/latest.geojson`): only well-formed polygon features are kept. */
+export interface NowcastFile {
+  type: 'FeatureCollection';
+  features: GeoJSON.Feature<GeoJSON.MultiPolygon, { district: string; level: number; color: string; warnings: string[]; issued: string; valid_until: string }>[];
+  generated: string;
+  newestIssue: string | null;
+  stale: boolean;
+  attribution: string;
+  counts: { light: number; moderate: number; severe: number };
+}
+
+export function parseNowcast(raw: unknown): NowcastFile {
+  const C = 'nowcast/latest.geojson';
+  const o = obj(C, '$', raw);
+  if (o.type !== 'FeatureCollection') throw new ContractError(C, 'type', 'expected "FeatureCollection"');
+  const features: NowcastFile['features'] = [];
+  for (const f of arr(C, 'features', o.features)) {
+    if (!isObj(f) || !isObj(f.geometry) || f.geometry.type !== 'MultiPolygon' || !isObj(f.properties)) continue;
+    const p = f.properties;
+    const level = typeof p.level === 'number' && p.level >= 1 && p.level <= 3 ? p.level : 1;
+    features.push({
+      type: 'Feature',
+      geometry: f.geometry as unknown as GeoJSON.MultiPolygon,
+      properties: {
+        district: typeof p.district === 'string' ? p.district : 'District',
+        level,
+        color: typeof p.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color) ? p.color : '#ffbf00',
+        warnings: Array.isArray(p.warnings) ? p.warnings.filter((w): w is string => typeof w === 'string').slice(0, 12) : [],
+        issued: typeof p.issued === 'string' ? p.issued : '',
+        valid_until: typeof p.valid_until === 'string' ? p.valid_until : ''
+      }
+    });
+  }
+  const c = isObj(o.counts) ? o.counts : {};
+  const n = (v: unknown) => (typeof v === 'number' ? v : 0);
+  return {
+    type: 'FeatureCollection',
+    features,
+    generated: typeof o.generated === 'string' ? o.generated : '',
+    newestIssue: typeof o.newest_issue === 'string' ? o.newest_issue : null,
+    stale: o.stale === true,
+    attribution: typeof o.attribution === 'string' ? o.attribution : 'India Meteorological Department (IMD)',
+    counts: { light: n(c.light), moderate: n(c.moderate), severe: n(c.severe) }
+  };
+}
