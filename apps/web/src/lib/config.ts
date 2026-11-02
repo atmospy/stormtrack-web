@@ -34,13 +34,14 @@ export const MAP = {
 } as const;
 
 /**
- * Wind particle look. Over a filled colour field (temperature, rain) the particles are thinner, fainter and
- * have shorter trails so the field underneath stays readable; wind itself and contour fields (pressure,
- * whose isobars are thin lines) keep the full look.
+ * Wind particle look. Over a filled colour field (temperature, rain) the particles are thinner, white and have
+ * shorter trails: white is the one colour that stays visible on every colour of the field, and the thinner
+ * line leaves the field readable. Wind itself and contour fields (pressure, whose isobars are thin lines)
+ * keep the full coloured look.
  */
 export const WIND_LOOK = {
   full: { lineWidth: 1.4, opacity: 1, fadeOpacity: 0.94 },
-  overField: { lineWidth: 0.9, opacity: 0.5, fadeOpacity: 0.9 }
+  overField: { lineWidth: 1.05, opacity: 0.9, fadeOpacity: 0.92 }
 } as const;
 
 /** Frame playback */

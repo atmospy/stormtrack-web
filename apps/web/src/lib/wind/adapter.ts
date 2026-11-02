@@ -16,6 +16,12 @@ export async function createWindLayer(opts: WindLayerOptions): Promise<WindLayer
   return new mod.WindLayer(opts);
 }
 
+/** Plain white particles, used over a colour field where the speed colours would be lost in it. */
+export const WHITE_RAMP: ColorRamp = [
+  [0, '#ffffff'],
+  [40, '#ffffff']
+];
+
 /** Speed colour ramp used by the arrow field and the legend (matches the particle layer's look). */
 export const WIND_RAMP: ColorRamp = [
   [0, '#4cc9ff'],

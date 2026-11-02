@@ -8,7 +8,7 @@
   import { weather } from '#lib/weather/runtime.svelte';
   import { meteo } from '#lib/weather/meteo.svelte';
   import { windMetaFor } from '#lib/data/weather';
-  import { createWindLayer, WIND_RAMP, type WindLayerLike } from '#lib/wind/adapter';
+  import { createWindLayer, WHITE_RAMP, WIND_RAMP, type WindLayerLike } from '#lib/wind/adapter';
   import { computeIsobars, createScalarLayer, rampFor, scalarMeta, type ScalarLayerLike, type IsobarResult } from '#lib/scalar/adapter';
   import { ProjectionControl } from '#lib/map/projectionControl';
   import { addIsobarLayers, setIsobars, setIsobarVisibility } from '#lib/map/isobars';
@@ -345,7 +345,8 @@
     const layer = windLayer;
     const v = app.variable;
     if (!layer) return;
-    layer.setOptions(v === 'temperature' || v === 'precipitation' ? { ...WIND_LOOK.overField } : { ...WIND_LOOK.full });
+    const overField = v === 'temperature' || v === 'precipitation';
+    layer.setOptions(overField ? { ...WIND_LOOK.overField, colorRamp: WHITE_RAMP } : { ...WIND_LOOK.full, colorRamp: WIND_RAMP });
   });
 
   const windMetas = new WeakMap<object, ReturnType<typeof windMetaFor>>();
