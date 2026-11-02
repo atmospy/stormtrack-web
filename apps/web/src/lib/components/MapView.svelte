@@ -10,6 +10,7 @@
   import { windMetaFor } from '#lib/data/weather';
   import { createWindLayer, WIND_RAMP, type WindLayerLike } from '#lib/wind/adapter';
   import { computeIsobars, createScalarLayer, rampFor, scalarMeta, type ScalarLayerLike, type IsobarResult } from '#lib/scalar/adapter';
+  import { ProjectionControl } from '#lib/map/projectionControl';
   import { addIsobarLayers, setIsobars, setIsobarVisibility } from '#lib/map/isobars';
   import { addLightningLayers, setCoverage, setLightningVisibility } from '#lib/map/lightning';
   import type { LightningGLLayer } from '#lib/lightning/layer';
@@ -67,6 +68,7 @@
         canvasContextAttributes: { antialias: false }
       });
       m.addControl(new maplibre.NavigationControl({ visualizePitch: true }), 'top-right');
+      m.addControl(new ProjectionControl(), 'top-right');
       m.on('load', () => {
         if (disposed) return;
         addArrowLayer(m);
@@ -369,7 +371,7 @@
     (async () => {
       const ramp = await rampFor(app.variable);
       if (!ramp || !map) return;
-      const layer = await createScalarLayer({ id: SCALAR_ID, ramp, opacity: 0.78 });
+      const layer = await createScalarLayer({ id: SCALAR_ID, ramp, opacity: app.variable === 'pressure' ? 0.6 : 0.92 });
       const w = weather.scalar;
       if (!map || !w) return;
       layer.setFrame(scalarMeta(w.cur.model.grid, w.cur.field as never), w.cur.bitmap, w.next?.bitmap ?? null, 0);
