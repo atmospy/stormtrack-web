@@ -5,10 +5,15 @@
  */
 import type { Map as MlMap, RasterTileSource } from 'maplibre-gl';
 
+/**
+ * Each satellite is drawn only over its own longitude band, so the discs do not overlap and leave a seam where two
+ * scans with different timing and viewing angles meet: Himawari 60E to the antimeridian, GOES-West from there to
+ * 110W, GOES-East 110W eastward. Tiles outside a source's bounds are never requested.
+ */
 export const CLOUD_SOURCES = [
-  { id: 'clouds-himawari', layer: 'Himawari_AHI_Band13_Clean_Infrared' },
-  { id: 'clouds-goes-west', layer: 'GOES-West_ABI_Band13_Clean_Infrared' },
-  { id: 'clouds-goes-east', layer: 'GOES-East_ABI_Band13_Clean_Infrared' }
+  { id: 'clouds-himawari', layer: 'Himawari_AHI_Band13_Clean_Infrared', bounds: [60, -85, 180, 85] },
+  { id: 'clouds-goes-west', layer: 'GOES-West_ABI_Band13_Clean_Infrared', bounds: [-180, -85, -110, 85] },
+  { id: 'clouds-goes-east', layer: 'GOES-East_ABI_Band13_Clean_Infrared', bounds: [-110, -85, 20, 85] }
 ] as const;
 export const CLOUD_OPACITY = 0.8;
 const STEP = 10 * 60_000;
@@ -34,7 +39,7 @@ export function setClouds(map: MlMap, on: boolean, time: string): void {
     const src = map.getSource(s.id) as RasterTileSource | undefined;
     if (!src) {
       if (!on) continue;
-      map.addSource(s.id, { type: 'raster', tiles, tileSize: 256, maxzoom: 6, attribution: 'NOAA GOES, JMA Himawari via NASA GIBS' });
+      map.addSource(s.id, { type: 'raster', tiles, tileSize: 256, maxzoom: 6, bounds: [...s.bounds], attribution: 'NOAA GOES, JMA Himawari via NASA GIBS' });
       const before = map.getLayer('waterway') ? 'waterway' : undefined;
       map.addLayer({ id: s.id, type: 'raster', source: s.id, paint: { 'raster-opacity': CLOUD_OPACITY, 'raster-fade-duration': 0 } }, before);
       continue;
