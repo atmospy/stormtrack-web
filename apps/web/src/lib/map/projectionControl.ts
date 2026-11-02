@@ -33,7 +33,7 @@ export class ProjectionControl implements IControl {
     this.btn.addEventListener('click', () => this.set(this.mode === 'globe' ? 'mercator' : 'globe'));
     this.box.append(this.btn);
     this.paint();
-    if (this.mode !== 'globe') map.setProjection({ type: this.mode });
+    if (this.mode !== 'globe') this.apply();
     return this.box;
   }
 
@@ -48,11 +48,26 @@ export class ProjectionControl implements IControl {
 
   private set(mode: Mode): void {
     this.mode = mode;
-    this.map?.setProjection({ type: mode });
+    this.apply();
     try {
       localStorage.setItem(KEY, mode);
     } catch { /* private mode: the choice just isn't remembered */ }
     this.paint();
+  }
+
+  /** Set the map's projection, waiting for the style when it is not loaded yet (setProjection throws before that). */
+  private apply(): void {
+    const map = this.map;
+    if (!map) return;
+    const go = () => {
+      try {
+        map.setProjection({ type: this.mode });
+      } catch (e) {
+        console.warn('projection not applied', e);
+      }
+    };
+    if (map.isStyleLoaded()) go();
+    else map.once('style.load', go);
   }
 
   private paint(): void {
