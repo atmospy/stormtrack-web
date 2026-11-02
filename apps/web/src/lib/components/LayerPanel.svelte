@@ -48,7 +48,7 @@
         {@const a = app.availability[r.key]}
         {@const off = a === 'missing' || a === 'error'}
         <li>
-          <label class:off>
+          <label class:off title="{r.label} ({r.key_})">
             <input type="checkbox" role="switch" checked={app.layers[r.key]} disabled={off} onchange={() => app.toggle(r.key)} />
             <span class="sw" aria-hidden="true"></span>
             <span class="ic"><Icon name={r.icon} size={16} /></span>
@@ -57,7 +57,7 @@
               <span class="hint">{sub(r.key, r.hint)}</span>
             </span>
             {#if a === 'loading'}<span class="dot" title="Loading"></span>{:else if count(r.key)}<span class="n tnum">{count(r.key)}</span>{/if}
-            <kbd class="k">{r.key_}</kbd>
+            
           </label>
         </li>
       {/each}
@@ -84,36 +84,37 @@
 </aside>
 
 <style>
-  .panel { position: absolute; top: calc(var(--gap) * 2 + 40px + env(safe-area-inset-top, 0px)); left: var(--gap); width: 284px; z-index: 4; overflow-x: hidden; overflow-y: auto; max-height: calc(100% - var(--timebar-h) - 100px - var(--gap) * 2); scrollbar-width: thin; }
-  .head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; background: none; border: 0; color: var(--text-dim); }
+  .panel { position: absolute; top: calc(var(--gap) * 2 + 38px + env(safe-area-inset-top, 0px)); left: var(--gap); width: 256px; z-index: 4; overflow-x: hidden; overflow-y: auto; max-height: calc(100% - var(--timebar-h) - var(--dock-bottom) - 92px - env(safe-area-inset-top, 0px)); }
+  .head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 14px 6px; background: none; border: 0; color: var(--text-faint); }
   .chev { margin-left: auto; transition: transform 0.2s; transform: rotate(-90deg); display: grid; }
   .chev.open { transform: none; }
-  ul { list-style: none; margin: 0; padding: 0 6px 6px; }
-  label { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; cursor: pointer; position: relative; }
-  label:hover { background: rgba(255, 255, 255, 0.05); }
-  label.off { opacity: 0.55; cursor: not-allowed; }
+  ul { list-style: none; margin: 0; padding: 2px 6px 6px; }
+  label { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; cursor: pointer; position: relative; }
+  label:hover { background: rgba(255, 255, 255, 0.045); }
+  label.off { opacity: 0.45; cursor: not-allowed; }
   input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: inherit; }
-  .sw { width: 28px; height: 16px; border-radius: 9px; background: rgba(255, 255, 255, 0.12); position: relative; flex: none; transition: background 0.2s; }
-  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #cfe0ff; transition: transform 0.2s; }
-  input:checked + .sw { background: linear-gradient(135deg, #1ec8f0, #6b6bff); box-shadow: var(--glow); }
-  input:checked + .sw::after { transform: translateX(12px); background: #fff; }
+  .sw { width: 24px; height: 14px; border-radius: 8px; background: rgba(255, 255, 255, 0.1); position: relative; flex: none; transition: background 0.2s; }
+  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: #8da2c9; transition: transform 0.2s, background 0.2s; }
+  input:checked + .sw { background: rgba(111, 227, 255, 0.28); }
+  input:checked + .sw::after { transform: translateX(10px); background: var(--accent); box-shadow: 0 0 8px rgba(111, 227, 255, 0.7); }
   input:focus-visible + .sw { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .ic { color: var(--accent); display: grid; }
+  .ic { color: var(--text-faint); display: grid; transition: color 0.2s; }
+  input:checked ~ .ic { color: var(--accent); }
   .txt { display: grid; min-width: 0; flex: 1; line-height: 1.2; }
-  .nm { font-weight: 550; }
-  .hint { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .n { font-size: 11.5px; color: var(--text-dim); background: rgba(255, 255, 255, 0.06); padding: 1px 7px; border-radius: 8px; }
+  .nm { font-weight: 500; font-size: 13px; }
+  .hint { font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 0; opacity: 0; transition: max-height 0.2s, opacity 0.2s; }
+  label:hover .hint, label.off .hint, label:focus-within .hint { max-height: 16px; opacity: 1; }
+  .n { font-size: 11px; color: var(--text-faint); }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite alternate; }
   @keyframes blink { to { opacity: 0.2; } }
-  .k { opacity: 0.6; }
   .sec { padding: 10px 14px 12px; border-top: 1px solid var(--line); }
   .wm { padding-top: 8px; padding-bottom: 8px; }
-  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; background: rgba(255, 255, 255, 0.05); border-radius: 9px; }
-  .seg button { border: 0; background: none; padding: 5px; border-radius: 7px; color: var(--text-dim); font-size: 12px; }
-  .seg button.on { background: rgba(94, 224, 255, 0.16); color: var(--text); }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; }
+  .seg button { border: 0; background: none; padding: 5px; border-radius: 6px; color: var(--text-faint); font-size: 12px; }
+  .seg button.on { background: rgba(111, 227, 255, 0.13); color: var(--text); }
   .seg button:disabled { opacity: 0.5; cursor: not-allowed; }
   .cats { display: flex; flex-wrap: wrap; gap: 4px 10px; }
-  .cat { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-dim); }
-  .cat i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  @media (max-width: 720px) { .panel { width: min(284px, calc(100vw - 2 * var(--gap))); } .k { display: none; } }
+  .cat { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-faint); }
+  .cat i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  @media (max-width: 720px) { .panel { width: min(256px, calc(100vw - 2 * var(--gap))); } }
 </style>
