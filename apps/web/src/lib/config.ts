@@ -11,6 +11,8 @@ export const SUPABASE_URL = env.PUBLIC_SUPABASE_URL || '';
 export const SUPABASE_ANON_KEY = env.PUBLIC_SUPABASE_ANON_KEY || '';
 /** Where people can reach the operator about privacy requests. Empty until set; the legal pages then say so. */
 export const CONTACT_EMAIL = env.PUBLIC_CONTACT_EMAIL || '';
+/** Google OAuth web client ID (public by design). When set, the sign-in dialog shows Google's own button. */
+export const GOOGLE_CLIENT_ID = env.PUBLIC_GOOGLE_CLIENT_ID || '';
 export const AUTH_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 /** Login gate (CONTRACTS section 5). */

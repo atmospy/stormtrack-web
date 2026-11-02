@@ -188,6 +188,7 @@ Settings -> Secrets and variables -> Actions. Create GitHub **Environments** `pr
 | `PUBLIC_DATA_BASE` | variable | `https://data.DOMAIN` | `deploy-web.yml`, `ci.yml` |
 | `PUBLIC_API_BASE` | variable (optional) | Render service URL | `deploy-web.yml` |
 | `PUBLIC_SITE_URL` | variable | `https://DOMAIN` | `deploy-web.yml` |
+| `PUBLIC_GOOGLE_CLIENT_ID` | variable (optional) | Google OAuth web client ID (public). Set it to show Google's own sign-in button, so Google's screen names the site and not the Supabase address. Also add the site as an Authorized JavaScript origin on that client | `deploy-web.yml` |
 | `PUBLIC_CONTACT_EMAIL` | variable (optional) | where privacy requests go; shown on `/privacy` and `/terms`. Empty means the pages point to the GitHub issue tracker | `deploy-web.yml` |
 | `CF_PAGES_PROJECT` | variable (optional) | default `stormtrack-web` | `deploy-web.yml` |
 | `INGEST_ENABLED` | variable (optional) | set to `false` to pause all scheduled ingest | `ingest.yml` |
@@ -210,6 +211,11 @@ What you can set:
 - **Supabase -> Authentication -> URL Configuration:** Site URL `https://DOMAIN`; Redirect URLs
   for `https://DOMAIN/**` (and the exact `https://DOMAIN/`), the `pages.dev` address, and
   `http://localhost:5173/**`. A wrong Site URL sends people to the wrong site after sign-in.
+- **Google Cloud -> Google Auth Platform -> Clients -> your web client:** under Authorized
+  JavaScript origins add `https://DOMAIN` and `http://localhost:5173`, and set
+  `PUBLIC_GOOGLE_CLIENT_ID` (GitHub and Cloudflare Pages) to the client ID. Keep the Supabase
+  callback under Authorized redirect URIs: the redirect button is the fallback. Changes can take
+  from five minutes to a few hours. Google's script loads only when the sign-in window opens.
 - **Google Cloud -> Google Auth Platform -> Branding:** app name StormTrack, logo
   `docs/brand/stormtrack-mark-120.png`, home page `https://DOMAIN`, privacy policy
   `https://DOMAIN/privacy`, terms `https://DOMAIN/terms`, authorized domain of the site.
