@@ -142,10 +142,10 @@
       {#if fixes.length > 1}
         <div class="sec">
           <div class="label">Track fixes <span class="leg">UTC · click to jump</span></div>
-          <div class="fixes tnum" role="list">
+          <div class="fixes tnum">
             {#each fixes as x, i (i)}
               {@const c = categoryFromWind(x.w)}
-              <button class="fx" class:on={i === activeFix} class:fc={x.fc} role="listitem" onclick={() => goto(x.t)} title={x.fc ? `Forecast +${x.tau} h` : 'Observed fix'}>
+              <button class="fx" class:on={i === activeFix} class:fc={x.fc} onclick={() => goto(x.t)} title={x.fc ? `Forecast +${x.tau} h` : 'Observed fix'}>
                 <span class="d">{fmtFix(x.t)}</span>
                 <span class="k" style="background:{c.color}">{x.fc ? 'F' : 'O'}</span>
                 <span class="w">{x.w ?? '–'} kt</span>
