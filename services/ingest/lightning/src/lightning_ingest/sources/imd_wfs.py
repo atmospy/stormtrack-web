@@ -1,7 +1,6 @@
 """India Meteorological Department lightning strikes, from IMD's public GeoServer (UNDOCUMENTED).
 
-The Mausam app (IMD) draws its lightning layer from the ``imd_ws:lightning_data_v`` layer of IMD's
-GeoServer. Read as WFS GeoJSON it is the current snapshot of strikes (about 20 min) over India and
+IMD's public GeoServer serves the ``imd_ws:lightning_data_v`` layer. Read as WFS GeoJSON it is the current snapshot of strikes (about 20 min) over India and
 the surrounding seas, one point per strike::
 
     {"properties": {"id": 196355535, "date": "2026-11-02Z", "time": "1970-01-01T13:59:49Z",
@@ -16,9 +15,8 @@ reach us 5 to 35 minutes late; the delay is measured on every poll and published
 (signed), ``cloud``/``ground`` mark intra-cloud and cloud-to-ground strikes. There is no energy,
 so ``energy_fj`` is NaN, and we publish only position and time.
 
-No terms of use are published for this service. It is the data source of IMD's own app, read here
-once per poll from a descriptive User-Agent, never by visitors' browsers; the source is marked
-``unofficial``.
+IMD publishes no terms for this service. It is read here once per poll from a descriptive User-Agent, never by
+visitors' browsers, and the source is marked ``unofficial``.
 
 Politeness: one request per poll, one retry after 5 s on a network error, a 20 s timeout, an 8 MB
 response cap and a minimum interval of 60 s between requests, kept in the source state.
@@ -120,10 +118,7 @@ def parse(body: bytes, now: float):
 class ImdLightning:
     id = "imd-lightning"
     name = "IMD lightning (India Meteorological Department public map service, unofficial access)"
-    licence = (
-        "No published licence or terms for this service. Used as the data source of IMD's own "
-        "app, fetched server-side on a schedule; credit IMD. Written permission has not been requested."
-    )
+    licence = "IMD publishes no licence or terms for this service; credit the India Meteorological Department"
     attribution = "Lightning data: India Meteorological Department (IMD)"
     kind = "ground-network"
     time_precision = "exact"
