@@ -9,7 +9,7 @@ const C = {
   land: '#141f38',
   water: '#060b18',
   landcover: '#18253f',
-  boundary: '#34476b',
+  boundary: '#5b76ab',
   boundaryState: '#243250',
   road: '#1c2943',
   label: '#9fb3d6',
@@ -40,12 +40,13 @@ export function darkStyle(): StyleSpecification {
     },
     {
       id: 'boundary_state', type: 'line', source: 'ofm', 'source-layer': 'boundary', minzoom: 4,
-      filter: ['all', ['==', 'admin_level', 4], ['!=', 'maritime', 1]],
+      filter: ['all', ['==', 'admin_level', 4], ['!=', 'maritime', 1], ['!=', 'disputed', 1]],
       paint: { 'line-color': C.boundaryState, 'line-width': 0.6, 'line-dasharray': [3, 2] }
     },
     {
-      id: 'boundary_country', type: 'line', source: 'ofm', 'source-layer': 'boundary',
-      filter: ['all', ['==', 'admin_level', 2], ['!=', 'maritime', 1]],
+      // Country borders come from Natural Earth's India point of view (the official map of India), not from
+      // OpenStreetMap, whose disputed-border lines differ. See scripts/make-boundaries.py.
+      id: 'boundary_country', type: 'line', source: 'borders',
       paint: { 'line-color': C.boundary, 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.5, 6, 1.2], 'line-opacity': 0.9 }
     },
     {
@@ -97,7 +98,7 @@ export function darkStyle(): StyleSpecification {
       'fog-ground-blend': 0.3,
       'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0]
     },
-    sources: { ofm: { type: 'vector', url: MAP.openFreeMapTiles, attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' } },
+    sources: { borders: { type: 'geojson', data: new URL('boundaries-india.geojson', typeof location === 'undefined' ? 'http://localhost/' : location.href).href, attribution: 'Borders: Natural Earth (India point of view)' }, ofm: { type: 'vector', url: MAP.openFreeMapTiles, attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' } },
     glyphs: MAP.glyphs,
     layers
   } as StyleSpecification;
