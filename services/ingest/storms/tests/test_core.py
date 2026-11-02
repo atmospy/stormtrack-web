@@ -334,3 +334,25 @@ def test_validators_catch_errors():
     }
     assert validate_active(bad)
     assert validate_index({"schema": 2})
+
+
+def test_previous_index_is_fetched_with_a_user_agent(monkeypatch, tmp_path):
+    """Cloudflare 403s Python's default user agent; without one the previous index (and its blocks) is lost."""
+    import io
+    import json
+    import urllib.request
+
+    from storms_ingest import cli
+
+    seen = {}
+
+    def fake_urlopen(req, timeout=None):
+        seen["ua"] = req.get_header("User-agent")
+        return io.BytesIO(
+            json.dumps({"schema": 1, "active": {"count": 2}, "history": {"NI": {}}}).encode()
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    prev = cli._read_prev_index(tmp_path, "https://data.example.test")
+    assert seen["ua"] == "stormtrack-web-ingest"
+    assert prev["active"]["count"] == 2 and "NI" in prev["history"]

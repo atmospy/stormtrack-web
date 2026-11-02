@@ -82,7 +82,10 @@ def _read_prev_index(out: Path, base_url) -> dict:
 
     try:
         url = base_url.rstrip("/") + "/storms/index.json"
-        with urllib.request.urlopen(url, timeout=20) as r:  # noqa: S310
+        # Cloudflare answers 403 to Python's default user agent, which silently dropped the previous
+        # index (and with it the active and history blocks), so identify ourselves
+        req = urllib.request.Request(url, headers={"User-Agent": "stormtrack-web-ingest"})
+        with urllib.request.urlopen(req, timeout=20) as r:  # noqa: S310
             data = json.loads(r.read())
         return data if isinstance(data, dict) else {}
     except Exception as exc:  # noqa: BLE001 - a missing/unreachable index just means a fresh start
