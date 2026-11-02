@@ -20,6 +20,7 @@
     { key: 'fires', label: 'Fire hotspots', icon: 'fire', hint: 'NASA FIRMS', key_: 'F' },
     { key: 'lightning', label: 'Lightning', icon: 'bolt', hint: 'GOES GLM Americas · IMD India', key_: 'G' },
     { key: 'clouds', label: 'Cloud imagery', icon: 'cloud', hint: 'GOES, Himawari infrared', key_: 'C' },
+    { key: 'sondes', label: 'Radiosondes', icon: 'event', hint: 'SondeHub live balloons', key_: 'B' },
     { key: 'satellite', label: 'Satellite', icon: 'cloud', hint: 'INSAT infrared', key_: 'I', group: 'India · IMD' },
     { key: 'nowcast', label: 'District warnings', icon: 'event', hint: 'nowcast, valid ~3 h', key_: 'N', group: 'India · IMD' }
   ];

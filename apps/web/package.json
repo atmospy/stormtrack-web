@@ -17,7 +17,8 @@
     "@stormtrack/scalar-layer": "workspace:*",
     "@stormtrack/wind-layer": "workspace:*",
     "@supabase/supabase-js": "^2.118.0",
-    "maplibre-gl": "^6.16.0"
+    "maplibre-gl": "^6.16.0",
+    "mqtt": "5.10.1"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^4.0.1",
