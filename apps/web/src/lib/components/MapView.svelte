@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import type { Map as MlMap, Marker, Popup, MapMouseEvent } from 'maplibre-gl';
   import type * as MapLibre from 'maplibre-gl';
-  import { MAP } from '#lib/config';
+  import { MAP, WIND_LOOK } from '#lib/config';
   import { app } from '#lib/stores/app.svelte';
   import { toast } from '#lib/stores/toast.svelte';
   import { weather } from '#lib/weather/runtime.svelte';
@@ -338,6 +338,14 @@
         toast.show('Wind particles unavailable, showing arrow field', 'warn');
       })
       .finally(() => (creatingWind = false));
+  });
+
+  // over a filled colour field the particles step back so the field can be read; contour fields keep the full look
+  $effect(() => {
+    const layer = windLayer;
+    const v = app.variable;
+    if (!layer) return;
+    layer.setOptions(v === 'temperature' || v === 'precipitation' ? { ...WIND_LOOK.overField } : { ...WIND_LOOK.full });
   });
 
   const windMetas = new WeakMap<object, ReturnType<typeof windMetaFor>>();

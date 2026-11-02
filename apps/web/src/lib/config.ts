@@ -33,5 +33,15 @@ export const MAP = {
   initialZoom: 1.3
 } as const;
 
+/**
+ * Wind particle look. Over a filled colour field (temperature, rain) the particles are thinner, fainter and
+ * have shorter trails so the field underneath stays readable; wind itself and contour fields (pressure,
+ * whose isobars are thin lines) keep the full look.
+ */
+export const WIND_LOOK = {
+  full: { lineWidth: 1.4, opacity: 1, fadeOpacity: 0.94 },
+  overField: { lineWidth: 0.9, opacity: 0.5, fadeOpacity: 0.9 }
+} as const;
+
 /** Frame playback */
 export const PLAYBACK = { stepMs: 1100, preloadAhead: 2, cacheSize: 6 } as const;
