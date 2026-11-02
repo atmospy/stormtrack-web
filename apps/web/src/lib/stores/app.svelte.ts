@@ -1,10 +1,10 @@
-import type { ActiveStorms, BasinStats, HazardIndex, NowcastFile } from '#lib/data/contracts';
+import type { ActiveStorms, BasinStats, HazardIndex, NowcastFile, SatelliteMeta } from '#lib/data/contracts';
 import type { WeatherIndexEntry, WeatherModel } from '#lib/data/weather';
 import { levelKey, nearestIndex, primaryField, timeline, variablesOf, windFieldAt, type Variable } from '#lib/weather/select';
 import type { WindSample } from '#lib/weather/sample';
 import { gate } from './gate.svelte';
 
-export type LayerKey = 'wind' | 'storms' | 'history' | 'events' | 'quakes' | 'fires' | 'lightning' | 'nowcast';
+export type LayerKey = 'wind' | 'storms' | 'history' | 'events' | 'quakes' | 'fires' | 'lightning' | 'nowcast' | 'satellite';
 export type Availability = 'loading' | 'ready' | 'missing' | 'error';
 export interface Selection {
   type: 'active' | 'history';
@@ -28,8 +28,8 @@ class AppState {
   /** wind rendering: animated particles or static arrow field */
   windMode = $state<'particles' | 'arrows'>('particles');
 
-  layers = $state<Record<LayerKey, boolean>>({ wind: true, storms: true, history: false, events: true, quakes: true, fires: false, lightning: false, nowcast: false });
-  availability = $state<Record<LayerKey, Availability>>({ wind: 'loading', storms: 'loading', history: 'loading', events: 'loading', quakes: 'loading', fires: 'loading', lightning: 'ready', nowcast: 'loading' });
+  layers = $state<Record<LayerKey, boolean>>({ wind: true, storms: true, history: false, events: true, quakes: true, fires: false, lightning: false, nowcast: false, satellite: false });
+  availability = $state<Record<LayerKey, Availability>>({ wind: 'loading', storms: 'loading', history: 'loading', events: 'loading', quakes: 'loading', fires: 'loading', lightning: 'ready', nowcast: 'loading', satellite: 'loading' });
   notes = $state<Partial<Record<LayerKey, string>>>({});
 
   // ---- weather catalogue (CONTRACTS 1b, with legacy section 1 fallback) ----
@@ -55,6 +55,8 @@ class AppState {
   hazardsSample = $state(false);
   /** India district nowcast warnings (IMD); null until loaded or when the file is not published */
   nowcast = $state.raw<NowcastFile | null>(null);
+  /** INSAT infrared image (IMD): metadata plus the URL to load it from; null when not published */
+  satellite = $state.raw<(SatelliteMeta & { url: string }) | null>(null);
   hazards = $state.raw<Partial<Record<'events' | 'quakes' | 'fires', GeoJSON.FeatureCollection>>>({});
 
   selection = $state<Selection | null>(null);

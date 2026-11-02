@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ContractError, parseActiveStorms, parseHazardIndex, parseHazardPoints, parseHistory, parseStats, parseWindLatest, parseNowcast } from './contracts';
+import { ContractError, parseActiveStorms, parseHazardIndex, parseHazardPoints, parseHistory, parseStats, parseWindLatest, parseNowcast, parseSatellite } from './contracts';
 
 const sample = (p: string) => JSON.parse(readFileSync(resolve(__dirname, '../../../../../public-data/sample', p), 'utf8'));
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -129,5 +129,24 @@ describe('parseNowcast', () => {
   it('rejects something that is not a feature collection', () => {
     expect(() => parseNowcast({ type: 'Other', features: [] })).toThrow();
     expect(() => parseNowcast({ type: 'FeatureCollection' })).toThrow();
+  });
+});
+
+describe('parseSatellite', () => {
+  const ok = { image: 'insat-ir.jpg', bounds: [44.48, -10.02, 105.5, 45.51], changed_at: '2026-11-02T14:49:09Z', generated: '2026-11-02T15:00:00Z', sha256: 'abcdef0123456789', attribution: 'IMD', note: 'n' };
+
+  it('reads a valid file', () => {
+    const m = parseSatellite(ok);
+    expect(m.bounds).toEqual([44.48, -10.02, 105.5, 45.51]);
+    expect(m.sha8).toBe('abcdef01');
+    expect(m.image).toBe('insat-ir.jpg');
+  });
+
+  it('rejects an image path that is not a plain .jpg name, and bad boxes', () => {
+    expect(() => parseSatellite({ ...ok, image: '../secret.jpg' })).toThrow();
+    expect(() => parseSatellite({ ...ok, image: 'https://evil.example/x.jpg' })).toThrow();
+    expect(() => parseSatellite({ ...ok, bounds: [10, 0, 5, 1] })).toThrow(); // west >= east
+    expect(() => parseSatellite({ ...ok, bounds: [0, 0, 400, 10] })).toThrow(); // out of range
+    expect(() => parseSatellite({ ...ok, bounds: [1, 2, 3] })).toThrow();
   });
 });
