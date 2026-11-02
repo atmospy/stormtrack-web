@@ -22,7 +22,7 @@
   import { ACTIVE_HIT_LAYERS, HISTORY_LAYER, addStormLayers, setActiveData, setHighlight, setStormVisibility, startPulse } from '#lib/map/storms';
   import { setSatellite } from '#lib/map/satellite';
   import { cloudTime, setClouds } from '#lib/map/clouds';
-  import { SONDE_HIT_LAYERS, addSondeLayers, setSondeData, setSondeVisibility, sondePopup } from '#lib/map/sondes';
+  import { SONDE_HIT_LAYERS, addSondeLayers, setSondeData, setSondeVisibility } from '#lib/map/sondes';
   import { sondes } from '#lib/sondes/state.svelte';
   import { NOWCAST_HIT_LAYERS, addNowcastLayers, nowcastPopup, setNowcastData, setNowcastVisibility } from '#lib/map/nowcast';
   import { HAZARD_HIT_LAYERS, addHazardLayers, popupContent, setHazardData, setHazardVisibility } from '#lib/map/hazards';
@@ -173,10 +173,8 @@
       const sd = hits(m, e, SONDE_HIT_LAYERS)[0];
       if (sd && app.layers.sondes) {
         popup?.remove();
-        popup = new maplibre.Popup({ offset: 10, closeButton: true, maxWidth: '240px' })
-          .setLngLat((sd.geometry as GeoJSON.Point).coordinates as [number, number])
-          .setDOMContent(sondePopup(sd.properties as Record<string, unknown>))
-          .addTo(m);
+        app.select(null, false);
+        void sondes.select({ serial: String(sd.properties?.serial), type: String(sd.properties?.type ?? '') });
         gate.interact();
         return;
       }

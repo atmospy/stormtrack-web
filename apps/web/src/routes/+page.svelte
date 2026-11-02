@@ -7,6 +7,8 @@
   import Readout from '#lib/components/Readout.svelte';
   import Conditions from '#lib/components/Conditions.svelte';
   import StormPanel from '#lib/components/StormPanel.svelte';
+  import SondePanel from '#lib/components/SondePanel.svelte';
+  import { sondes } from '#lib/sondes/state.svelte';
   import LightningHud from '#lib/components/LightningHud.svelte';
   import Provenance from '#lib/components/Provenance.svelte';
   import Weather from '#lib/components/Weather.svelte';
@@ -83,6 +85,7 @@
     if (e.key === 'Escape') {
       if (app.helpOpen) app.helpOpen = false;
       else if (app.authOpen) app.authOpen = false;
+      else if (sondes.selected) void sondes.select(null);
       else if (app.selection) app.select(null);
       else if (app.readout?.pinned) app.readout = null;
       else if (meteo.point) meteo.close();
@@ -116,6 +119,7 @@
   <LayerPanel />
   <Conditions />
   <StormPanel />
+  <SondePanel />
   <Readout />
   <TimeBar />
   <Meteogram store={meteo} onpin={() => { if (meteo.point) { meteoPinned.open(meteo.point.lon, meteo.point.lat); } }} onclose={() => { meteo.close(); app.readout = null; }} />

@@ -6,6 +6,7 @@
   import { toast } from '#lib/stores/toast.svelte';
   import { gate } from '#lib/stores/gate.svelte';
   import { meteo } from '#lib/weather/meteo.svelte';
+  import { sondes } from '#lib/sondes/state.svelte';
   import { MS_TO_KT, compass, msToKmh } from '#lib/util/storm';
 
   const r = $derived(app.readout);
@@ -25,7 +26,7 @@
   }
 </script>
 
-{#if r}
+{#if r && !sondes.selected}
   <div class="ro glass tnum" class:pinned={r.pinned} class:withmg={meteo.point !== null} role="status" aria-live={r.pinned ? 'polite' : 'off'}>
     <div class="coords">{fmt(r.lat, 'N', 'S')} {fmt(r.lon, 'E', 'W')}</div>
     {#if r.scalar != null && app.primary?.kind === 'scalar'}
